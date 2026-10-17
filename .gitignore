@@ -1,0 +1,21 @@
+#Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+build/
+# Local data and secrets
+data/
+.env
+# Terraform: never commit state, plans or local inputs
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+infra/backend.hcl
+infra/terraform.tfvars
+# Frontend
+node_modules/
+web/dist/
+web/public/data/
+out.json

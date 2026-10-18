@@ -1,0 +1,149 @@
+{
+  "_fixture_note": "REAL-SOURCE EXCERPT, hand-transcribed. Values copied from https://data.deadlock-api.com/v1/manifest.json as fetched 2026-10-12 (manifest version 629). Only a subset of tables, columns and files is included; rows_by_partition maps are abbreviated to their first entries and are NOT complete. Do not treat this file as the full manifest.",
+  "format_version": 1,
+  "version": 629,
+  "generated_at": "2026-10-12T00:46:59.122463748Z",
+  "public_url": "https://data.deadlock-api.com",
+  "catalog": "v1/catalog/629.ducklake",
+  "duckdb_version": "v1.5.6",
+  "last_fold_at": "2026-10-11T17:04:07.195537884Z",
+  "tables": {
+    "leaderboard": {
+      "policy": "snapshot",
+      "status": "ready",
+      "columns": [
+        {"name": "fetched_at", "type": "DateTime"},
+        {"name": "region", "type": "Enum8('Europe' = 1, 'Asia' = 2, 'NAmerica' = 3, 'SAmerica' = 4, 'Oceania' = 5)"},
+        {"name": "account_name", "type": "Nullable(String)"},
+        {"name": "rank", "type": "UInt32"},
+        {"name": "leaderboard_position", "type": "UInt32"},
+        {"name": "top_hero_ids", "type": "Array(UInt8)"}
+      ],
+      "generation": 0,
+      "watermark_hi": 1791765120,
+      "files": [
+        {
+          "key": "v1/tables/leaderboard/snapshot/20261012T003200Z-58eca196717a.parquet",
+          "kind": "snapshot",
+          "generation": 0,
+          "hi": 1791765120,
+          "rows": 16467894,
+          "bytes": 15021152,
+          "built_at": "2026-10-12T00:44:12.139521883Z"
+        }
+      ]
+    },
+    "match_player": {
+      "policy": "incremental",
+      "status": "ready",
+      "columns": [
+        {"name": "match_id", "type": "UInt64"},
+        {"name": "start_time", "type": "DateTime"},
+        {"name": "duration_s", "type": "UInt32"},
+        {"name": "match_mode", "type": "Enum8('Invalid' = 0, 'Unranked' = 1, 'PrivateLobby' = 2, 'CoopBot' = 3, 'Ranked' = 4, 'ServerTest' = 5, 'Tutorial' = 6, 'HeroLabs' = 7, 'NewPlayerPlacement' = 8)"},
+        {"name": "game_mode", "type": "Enum8('Invalid' = 0, 'Normal' = 1, 'OneVsOneTest' = 2, 'Sandbox' = 3, 'StreetBrawl' = 4, 'ExploreNYC' = 5, 'Internal' = 6)"},
+        {"name": "winning_team", "type": "Enum8('Team0' = 0, 'Team1' = 1, 'Spectator' = 16)"},
+        {"name": "match_outcome", "type": "Enum8('TeamWin' = 0, 'Error' = 1, 'Draw' = 2)"},
+        {"name": "not_scored", "type": "Nullable(Bool)"},
+        {"name": "account_id", "type": "UInt32", "comment": "steam id3"},
+        {"name": "player_slot", "type": "UInt32"},
+        {"name": "team", "type": "Enum8('Team0' = 0, 'Team1' = 1, 'Spectator' = 16)"},
+        {"name": "hero_id", "type": "UInt8"},
+        {"name": "abandon_match_time_s", "type": "UInt32"},
+        {"name": "won", "type": "Bool"},
+        {"name": "created_at", "type": "DateTime"},
+        {"name": "player_match_outcome", "type": "Enum8('Invalid' = 0, 'Win' = 1, 'Loss' = 2, 'Penalized' = 3, 'PenalizedParty' = 4, 'NotScored' = 5)"}
+      ],
+      "watermark": "created_at",
+      "partition_expr": "intDiv(match_id, 1000000)",
+      "generation": 2,
+      "watermark_hi": 1791765120,
+      "files": [
+        {
+          "key": "v1/tables/match_player/g2/base/part-2/20261004T170400Z-2bcf8c938fe6.parquet",
+          "kind": "base",
+          "generation": 2,
+          "partition": 2,
+          "hi": 1791133440,
+          "rows": 15807,
+          "bytes": 21993595,
+          "built_at": "2026-10-04T18:24:37Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/base/part-25/20261004T170400Z-2bcf8c938fe6.parquet",
+          "kind": "base",
+          "generation": 2,
+          "partition": 25,
+          "hi": 1791133440,
+          "rows": 6811866,
+          "bytes": 8837593619,
+          "built_at": "2026-10-04T18:44:29Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/residual/20261004T170400Z-20261005T123500Z-9abedaf1ef74.parquet",
+          "kind": "residual",
+          "generation": 2,
+          "lo": 1791133440,
+          "hi": 1791203700,
+          "rows": 216391,
+          "bytes": 353540889,
+          "rows_by_partition": {"3": 12, "4": 60, "5": 36},
+          "built_at": "2026-10-06T13:30:58.009633214Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/delta/20261010T160900Z-20261010T170900Z-fd73ede48ecc.parquet",
+          "kind": "delta",
+          "generation": 2,
+          "lo": 1791648540,
+          "hi": 1791652140,
+          "rows": 62687,
+          "bytes": 101560873,
+          "rows_by_partition": {"1": 12, "41": 84, "113": 17177, "114": 26291},
+          "built_at": "2026-10-10T17:19:39.097449725Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/delta/20261010T170900Z-20261010T173700Z-e837db2635a2.parquet",
+          "kind": "delta",
+          "generation": 2,
+          "lo": 1791652140,
+          "hi": 1791653820,
+          "rows": 32862,
+          "bytes": 55817569,
+          "rows_by_partition": {"10": 12, "11": 26, "113": 9224, "114": 12723},
+          "built_at": "2026-10-10T17:47:29.172551158Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/base/part-107/20261011T013700Z-fccfb20da6c6.parquet",
+          "kind": "base",
+          "generation": 2,
+          "partition": 107,
+          "hi": 1791682620,
+          "rows": 3087866,
+          "bytes": 4983768341,
+          "built_at": "2026-10-11T01:50:15.761585394Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/delta/20261011T100100Z-20261011T100700Z-b24086a50dde.parquet",
+          "kind": "delta",
+          "generation": 2,
+          "lo": 1791712860,
+          "hi": 1791713220,
+          "rows": 3169,
+          "bytes": 6207058,
+          "rows_by_partition": {"56": 36, "70": 12, "101": 12, "106": 8, "107": 16, "110": 80, "111": 204, "112": 232, "113": 676, "114": 1893},
+          "built_at": "2026-10-11T10:17:24.115778691Z"
+        },
+        {
+          "key": "v1/tables/match_player/g2/delta/20261011T135800Z-20261011T145800Z-1bf7a744654b.parquet",
+          "kind": "delta",
+          "generation": 2,
+          "lo": 1791727080,
+          "hi": 1791730680,
+          "rows": 60114,
+          "bytes": 94463131,
+          "rows_by_partition": {"11": 12, "33": 12, "34": 2}
+        }
+      ]
+    }
+  }
+}

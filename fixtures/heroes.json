@@ -1,0 +1,114 @@
+[
+ {
+  "id": 6,
+  "class_name": "hero_atlas",
+  "name": "Abrams",
+  "hero_type": "brawler",
+  "images": {}
+ },
+ {
+  "id": 7,
+  "class_name": "hero_wraith",
+  "name": "Wraith",
+  "hero_type": "marksman",
+  "images": {}
+ },
+ {
+  "id": 10,
+  "class_name": "hero_chrono",
+  "name": "Paradox",
+  "hero_type": "marksman",
+  "images": {}
+ },
+ {
+  "id": 11,
+  "class_name": "hero_dynamo",
+  "name": "Dynamo",
+  "hero_type": "mystic",
+  "images": {}
+ },
+ {
+  "id": 12,
+  "class_name": "hero_kelvin",
+  "name": "Kelvin",
+  "hero_type": "brawler",
+  "images": {}
+ },
+ {
+  "id": 13,
+  "class_name": "hero_haze",
+  "name": "Haze",
+  "hero_type": "assassin",
+  "images": {}
+ },
+ {
+  "id": 14,
+  "class_name": "hero_astro",
+  "name": "Holliday",
+  "hero_type": "marksman",
+  "images": {}
+ },
+ {
+  "id": 15,
+  "class_name": "hero_bebop",
+  "name": "Bebop",
+  "hero_type": "brawler",
+  "images": {}
+ },
+ {
+  "id": 19,
+  "class_name": "hero_shiv",
+  "name": "Shiv",
+  "hero_type": "brawler",
+  "images": {}
+ },
+ {
+  "id": 25,
+  "class_name": "hero_warden",
+  "name": "Warden",
+  "hero_type": "brawler",
+  "images": {}
+ },
+ {
+  "id": 27,
+  "class_name": "hero_yamato",
+  "name": "Yamato",
+  "hero_type": "assassin",
+  "images": {}
+ },
+ {
+  "id": 31,
+  "class_name": "hero_lash",
+  "name": "Lash",
+  "hero_type": "assassin",
+  "images": {}
+ },
+ {
+  "id": 35,
+  "class_name": "hero_viscous",
+  "name": "Viscous",
+  "hero_type": "mystic",
+  "images": {}
+ },
+ {
+  "id": 52,
+  "class_name": "hero_mirage",
+  "name": "Mirage",
+  "hero_type": "assassin",
+  "images": {}
+ },
+ {
+  "id": 64,
+  "class_name": "hero_drifter",
+  "name": "Drifter",
+  "hero_type": "assassin",
+  "images": {}
+ },
+ {
+  "id": 69,
+  "class_name": "hero_doorman",
+  "name": "The Doorman",
+  "hero_type": "mystic",
+  "images": {}
+ }
+]

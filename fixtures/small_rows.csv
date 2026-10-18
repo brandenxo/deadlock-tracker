@@ -1,0 +1,41 @@
+match_id,start_time,duration_s,match_mode,game_mode,winning_team,match_outcome,not_scored,player_slot,team,hero_id,won,created_at,note
+1001,2026-10-10T10:00:00Z,1800,Ranked,Normal,Team0,TeamWin,false,0,Team0,6,true,2026-10-10T10:40:00Z,
+1001,2026-10-10T10:00:00Z,1800,Ranked,Normal,Team0,TeamWin,false,1,Team0,15,true,2026-10-10T10:40:00Z,
+1001,2026-10-10T10:00:00Z,1800,Ranked,Normal,Team0,TeamWin,false,2,Team1,13,false,2026-10-10T10:40:00Z,
+1001,2026-10-10T10:00:00Z,1800,Ranked,Normal,Team0,TeamWin,false,3,Team1,14,false,2026-10-10T10:40:00Z,
+1002,2026-10-10T23:30:00Z,2400,Unranked,Normal,Team1,TeamWin,,0,Team0,6,false,2026-10-11T00:20:00Z,late-evening match: 2026-10-10 in UTC
+1002,2026-10-10T23:30:00Z,2400,Unranked,Normal,Team1,TeamWin,,1,Team0,11,false,2026-10-11T00:20:00Z,
+1002,2026-10-10T23:30:00Z,2400,Unranked,Normal,Team1,TeamWin,,2,Team1,15,true,2026-10-11T00:20:00Z,
+1002,2026-10-10T23:30:00Z,2400,Unranked,Normal,Team1,TeamWin,,3,Team1,14,true,2026-10-11T00:20:00Z,
+1003,2026-10-11T01:00:00Z,2000,Ranked,Normal,Team0,TeamWin,false,0,Team0,6,true,2026-10-11T01:45:00Z,
+1003,2026-10-11T01:00:00Z,2000,Ranked,Normal,Team0,TeamWin,false,0,Team0,6,true,2026-10-11T01:45:00Z,exact duplicate delivery
+1003,2026-10-11T01:00:00Z,2000,Ranked,Normal,Team0,TeamWin,false,1,Team0,14,true,2026-10-11T01:45:00Z,
+1003,2026-10-11T01:00:00Z,2000,Ranked,Normal,Team0,TeamWin,false,2,Team1,15,false,2026-10-11T01:45:00Z,
+1003,2026-10-11T01:00:00Z,2000,Ranked,Normal,Team0,TeamWin,false,3,Team1,13,false,2026-10-11T01:45:00Z,
+1004,2026-10-11T02:00:00Z,2100,Ranked,Normal,Team1,TeamWin,false,0,Team0,15,false,2026-10-11T02:50:00Z,
+1004,2026-10-11T02:00:00Z,2100,Ranked,Normal,Team1,TeamWin,false,1,Team0,13,false,2026-10-11T02:50:00Z,
+1004,2026-10-11T02:00:00Z,2100,Ranked,Normal,Team1,TeamWin,false,2,Team1,6,true,2026-10-11T02:50:00Z,
+1004,2026-10-11T02:00:00Z,2100,Ranked,Normal,Team1,TeamWin,false,3,Team1,14,true,2026-10-11T02:50:00Z,
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team1,TeamWin,false,0,Team0,6,false,2026-10-11T03:40:00Z,first delivery (later corrected)
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team1,TeamWin,false,1,Team0,15,false,2026-10-11T03:40:00Z,first delivery (later corrected)
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team1,TeamWin,false,2,Team1,13,true,2026-10-11T03:40:00Z,first delivery (later corrected)
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team1,TeamWin,false,3,Team1,14,true,2026-10-11T03:40:00Z,first delivery (later corrected)
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team0,TeamWin,false,0,Team0,6,true,2026-10-11T09:00:00Z,corrected outcome
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team0,TeamWin,false,1,Team0,15,true,2026-10-11T09:00:00Z,corrected outcome
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team0,TeamWin,false,2,Team1,13,false,2026-10-11T09:00:00Z,corrected outcome
+1005,2026-10-11T03:00:00Z,1900,Ranked,Normal,Team0,TeamWin,false,3,Team1,14,false,2026-10-11T09:00:00Z,corrected outcome
+1006,2026-10-11T04:00:00Z,600,Ranked,Normal,Team0,Error,false,0,Team0,6,false,2026-10-11T04:20:00Z,errored match
+1006,2026-10-11T04:00:00Z,600,Ranked,Normal,Team0,Error,false,1,Team0,15,false,2026-10-11T04:20:00Z,errored match
+1006,2026-10-11T04:00:00Z,600,Ranked,Normal,Team0,Error,false,2,Team1,13,false,2026-10-11T04:20:00Z,errored match
+1006,2026-10-11T04:00:00Z,600,Ranked,Normal,Team0,Error,false,3,Team1,14,false,2026-10-11T04:20:00Z,errored match
+1007,2026-10-11T05:00:00Z,2200,Ranked,Normal,Team0,TeamWin,false,0,Team0,6,true,2026-10-11T05:45:00Z,incomplete roster
+1007,2026-10-11T05:00:00Z,2200,Ranked,Normal,Team0,TeamWin,false,1,Team0,15,true,2026-10-11T05:45:00Z,incomplete roster
+1007,2026-10-11T05:00:00Z,2200,Ranked,Normal,Team0,TeamWin,false,2,Team1,13,false,2026-10-11T05:45:00Z,incomplete roster
+1008,2026-10-11T06:00:00Z,0,Ranked,Normal,Team1,TeamWin,false,0,Team0,14,false,2026-10-11T06:30:00Z,invalid duration
+1008,2026-10-11T06:00:00Z,0,Ranked,Normal,Team1,TeamWin,false,1,Team0,15,false,2026-10-11T06:30:00Z,invalid duration
+1008,2026-10-11T06:00:00Z,0,Ranked,Normal,Team1,TeamWin,false,2,Team1,6,true,2026-10-11T06:30:00Z,invalid duration
+1008,2026-10-11T06:00:00Z,0,Ranked,Normal,Team1,TeamWin,false,3,Team1,11,true,2026-10-11T06:30:00Z,invalid duration
+1009,2026-10-11T07:00:00Z,1500,PrivateLobby,Normal,Team0,TeamWin,,0,Team0,6,true,2026-10-11T07:30:00Z,private lobby
+1009,2026-10-11T07:00:00Z,1500,PrivateLobby,Normal,Team0,TeamWin,,1,Team0,15,true,2026-10-11T07:30:00Z,private lobby
+1009,2026-10-11T07:00:00Z,1500,PrivateLobby,Normal,Team0,TeamWin,,2,Team1,13,false,2026-10-11T07:30:00Z,private lobby
+1009,2026-10-11T07:00:00Z,1500,PrivateLobby,Normal,Team0,TeamWin,,3,Team1,14,false,2026-10-11T07:30:00Z,private lobby

@@ -1,0 +1,737 @@
+/*
+  Design: "Hero Ledger".
+  Deadlock is a 1920s occult New York where two teams fight: the Amber Hand and the
+  Sapphire Flame. We borrow those two colours for the only thing that needs colour:
+  above 50% is sapphire, below 50% is amber. Blue against orange also stays readable
+  for colour-blind viewers (checked with a palette validator in both themes).
+  Everything else is quiet: one condensed display face for headings and big numbers,
+  one plain face for the rest, thin rules instead of boxes.
+*/
+
+/* ---- Tokens ------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+  --page: #171a24; /* night sky over the city */
+  --surface: #1f2330;
+  --surface-raised: #272c3b;
+  --rule: #343a4c;
+  --text: #ece6d8; /* lamplit paper */
+  --text-secondary: #aaa69c;
+  --brass: #c9a96a; /* the only decorative colour */
+  --above: #4f8fe8; /* Sapphire Flame */
+  --below: #cc7f22; /* Amber Hand */
+  --track: #2d3243;
+  --grid: #2b3040;
+  --axis: #6b7184;
+  --line-series: #ece6d8;
+  --focus: #8fb8ff;
+  --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+}
+
+/* Light theme: for people who set their system to light. Same roles, new values. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --page: #e9ebf0;
+    --surface: #ffffff;
+    --surface-raised: #f3f4f7;
+    --rule: #d3d7e0;
+    --text: #1c2130;
+    --text-secondary: #565d6e;
+    --brass: #85682b;
+    --above: #2563c9;
+    --below: #b5650d;
+    --track: #e3e6ed;
+    --grid: #e3e6ed;
+    --axis: #8a90a0;
+    --line-series: #1c2130;
+    --focus: #1d5fd0;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page: #e9ebf0;
+  --surface: #ffffff;
+  --surface-raised: #f3f4f7;
+  --rule: #d3d7e0;
+  --text: #1c2130;
+  --text-secondary: #565d6e;
+  --brass: #85682b;
+  --above: #2563c9;
+  --below: #b5650d;
+  --track: #e3e6ed;
+  --grid: #e3e6ed;
+  --axis: #8a90a0;
+  --line-series: #1c2130;
+  --focus: #1d5fd0;
+}
+
+/* ---- Base --------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 400 16px/1.5 var(--font-body);
+  font-variant-numeric: tabular-nums; /* digits line up in columns */
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main,
+.masthead-inner,
+.colophon p {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+main {
+  flex: 1;
+  padding-bottom: 48px;
+}
+
+/* ---- Masthead ----------------------------------------------------------------- */
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding: 32px 0 24px;
+}
+
+.masthead-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.masthead h1 {
+  font-size: clamp(56px, 9vw, 104px);
+  letter-spacing: 0.01em;
+  /* The one ornament: a brass rule under the title, like a ledger's header line. */
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--brass);
+  display: inline-block;
+}
+
+.lede {
+  margin: 12px 0 0;
+  max-width: 56ch;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.status {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.status strong {
+  color: var(--text);
+}
+
+.status-icon {
+  color: var(--above);
+  margin-right: 6px;
+}
+
+.status-stale .status-icon {
+  color: var(--below);
+}
+
+/* ---- Controls ----------------------------------------------------------------- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 32px;
+  padding: 24px 0;
+}
+
+.range {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+
+.range legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.range label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 8px 10px;
+  min-height: 44px; /* comfortable touch target */
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 10px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.roles button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--rule);
+  border-radius: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.roles button[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--page);
+  border-color: var(--text);
+}
+
+.sample {
+  margin: 0 0 10px auto;
+  color: var(--text-secondary);
+}
+
+.sample strong {
+  color: var(--text);
+}
+
+/* ---- Tier board --------------------------------------------------------------- */
+.tiers {
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
+}
+
+.tiers h2 {
+  font-size: 40px;
+}
+
+.tiers-note,
+.tiers-unrated {
+  color: var(--text-secondary);
+  max-width: 70ch;
+}
+
+.tier-rows {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.tier-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tier-letter {
+  font: 800 56px/1 var(--font-display);
+  width: 52px;
+  text-align: center;
+  /* The letter itself is text, so it keeps the text colour; a bar beside it carries
+     the sapphire/amber meaning. */
+  border-left: 6px solid var(--track);
+  padding-left: 6px;
+}
+
+.tier-S .tier-letter,
+.tier-A .tier-letter {
+  border-left-color: var(--above);
+}
+
+.tier-C .tier-letter,
+.tier-D .tier-letter {
+  border-left-color: var(--below);
+}
+
+.tier-meaning {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.tier-heroes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tier-empty {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.tile[aria-pressed="true"] {
+  border-color: var(--brass);
+  box-shadow: inset 0 0 0 1px var(--brass);
+}
+
+.tile-name {
+  font-weight: 600;
+}
+
+.tile-rate {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ---- Avatars ------------------------------------------------------------------ */
+.avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule);
+}
+
+.avatar-small {
+  width: 36px;
+  height: 36px;
+}
+
+.avatar-large {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  font: 800 16px/1 var(--font-display);
+  color: var(--text-secondary);
+}
+
+.avatar-large .avatar-initials {
+  font-size: 30px;
+}
+
+/* ---- Main grid: table + hero panel -------------------------------------------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 32px;
+  align-items: start;
+  margin-top: 32px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--rule);
+}
+
+table.heroes {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.heroes th,
+.heroes td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.heroes thead th {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0;
+}
+
+.num {
+  text-align: right !important;
+}
+
+.sort {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: inherit;
+}
+
+th[aria-sort="ascending"] .sort,
+th[aria-sort="descending"] .sort {
+  color: var(--text);
+}
+
+.sort-mark {
+  display: inline-block;
+  width: 1em;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.heroes tbody tr.selected {
+  background: var(--surface);
+}
+
+.heroes tbody tr.selected th {
+  box-shadow: inset 3px 0 0 var(--brass);
+}
+
+.hero-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hero-pick-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.hero-name {
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.hero-role {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tier-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  font: 800 14px/20px var(--font-display);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  vertical-align: 2px;
+}
+
+.winrate {
+  display: inline-grid;
+  grid-template-columns: auto auto 80px;
+  align-items: center;
+  gap: 8px;
+}
+
+.winrate-value {
+  font-weight: 600;
+}
+
+.winrate-margin {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 3.6em;
+}
+
+.winrate-track {
+  position: relative;
+  height: 8px;
+  background: var(--track);
+  border-radius: 4px;
+}
+
+.winrate-track::after {
+  /* the 50% line */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--axis);
+}
+
+.winrate-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.winrate-bar.above {
+  left: 50%;
+  background: var(--above);
+  border-radius: 0 4px 4px 0;
+}
+
+.winrate-bar.below {
+  right: 50%;
+  background: var(--below);
+  border-radius: 4px 0 0 4px;
+}
+
+/* ---- Hero panel --------------------------------------------------------------- */
+.panel {
+  position: sticky;
+  top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.panel h2 {
+  font-size: 40px;
+}
+
+.panel-role {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.panel-rate {
+  margin: 20px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.panel-rate-value {
+  font: 800 64px/1 var(--font-display);
+}
+
+.panel-rate-label {
+  color: var(--text-secondary);
+}
+
+.panel-range {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.panel-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.panel-stats dt {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.panel-stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.trend figcaption {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.trend-title {
+  font-weight: 600;
+}
+
+.trend {
+  margin: 0;
+}
+
+.chart-tooltip {
+  background: var(--surface-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.tt-date {
+  font-weight: 600;
+}
+
+.chart-table summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+
+.chart-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+}
+
+/* ---- Notices and footer ------------------------------------------------------- */
+.loading,
+.notice {
+  margin: 32px 0;
+}
+
+.notice {
+  padding: 16px 20px;
+  background: var(--surface);
+  border-left: 4px solid var(--brass);
+  max-width: 70ch;
+}
+
+.notice.error {
+  border-left-color: var(--below);
+}
+
+.notice button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+
+.colophon {
+  border-top: 1px solid var(--rule);
+  padding: 20px 0 32px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.colophon p {
+  margin: 0 auto;
+  max-width: 1240px;
+}
+
+/* ---- Narrow screens ----------------------------------------------------------- */
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  /* On a phone the selected hero's panel comes first, then the table. */
+  .panel {
+    position: static;
+    order: -1;
+  }
+  .tier {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .sample {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

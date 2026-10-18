@@ -19,6 +19,12 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+extraPaths = [".", ".venv/lib/python3.12/site-packages"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

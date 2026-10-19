@@ -1,0 +1,52 @@
+# Every push and pull request. No AWS credentials needed: tests use local files and a
+# mocked S3, and Terraform is only formatted and validated, never applied.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v9.0.0
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+      # The Lambda package builds and imports on Linux, as it will in AWS.
+      - run: tools/build_lambda.sh
+      - run: cd build/lambda && "$(uv python find 3.12)" -I -S -c "import sys; sys.path.insert(0, '.'); import pipeline.lambda_handler, duckdb"
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+      - run: npx -y npm@11.6.2 ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build # includes the TypeScript check
+
+  terraform:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: hashicorp/setup-terraform@v4.0.1
+      - run: terraform fmt -check
+      - run: mkdir -p ../build && touch ../build/pipeline.zip # validate hashes the zip path
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

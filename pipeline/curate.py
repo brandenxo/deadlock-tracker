@@ -140,8 +140,8 @@ def run_sql(con: duckdb.DuckDBPyConnection, players_per_team: int) -> None:
 @dataclass
 class Curation:
     source_rows: int
-    hero_daily: list[dict]  # one row per (date, hero)
-    daily_matches: dict[str, int]  # date -> eligible match count
+    hero_daily: list[dict]  # one row per (date, match_mode, hero)
+    daily_matches: dict[str, dict[str, int]]  # date -> match_mode -> eligible match count
     exclusions: dict[str, dict[str, int]]  # date -> reason -> match count
     won_flag_disagreements: int
 
@@ -172,21 +172,22 @@ def curate(
         "FROM match_exclusions GROUP BY ALL ORDER BY ALL",
     ):
         exclusions.setdefault(row["d"], {})[row["reason"]] = row["n"]
+    daily_matches: dict[str, dict[str, int]] = {}
+    for row in _rows(
+        con,
+        "SELECT strftime(match_date_utc, '%Y-%m-%d') AS d, match_mode, COUNT(*) AS n "
+        "FROM curated_matches GROUP BY ALL ORDER BY ALL",
+    ):
+        daily_matches.setdefault(row["d"], {})[row["match_mode"]] = row["n"]
     return Curation(
         source_rows=source_rows,
         hero_daily=_rows(
             con,
-            "SELECT strftime(match_date_utc, '%Y-%m-%d') AS date, hero_id, appearances, wins, "
-            "duration_sum_s, duration_count, matches_with_hero FROM hero_daily ORDER BY 1, 2",
+            "SELECT strftime(match_date_utc, '%Y-%m-%d') AS date, match_mode, hero_id, "
+            "appearances, wins, duration_sum_s, duration_count, matches_with_hero "
+            "FROM hero_daily ORDER BY 1, 2, 3",
         ),
-        daily_matches={
-            r["d"]: r["n"]
-            for r in _rows(
-                con,
-                "SELECT strftime(match_date_utc, '%Y-%m-%d') AS d, COUNT(*) AS n "
-                "FROM curated_matches GROUP BY 1 ORDER BY 1",
-            )
-        },
+        daily_matches=daily_matches,
         exclusions=exclusions,
         won_flag_disagreements=con.execute(
             "SELECT COUNT(*) FROM curated_participants WHERE won_flag_disagrees"

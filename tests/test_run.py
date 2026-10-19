@@ -94,6 +94,19 @@ def test_validation_catches_counters_that_do_not_add_up(tmp_path, source):
         summary.validate(doc, _curation_stub(doc), players_per_team=6)
 
 
+def test_validation_checks_each_match_mode_separately(tmp_path, source):
+    store = LocalStore(tmp_path / "data")
+    run_once(SETTINGS, store, source, now=NOW)
+    doc = read_summary(store)
+    assert doc["schema_version"] == 2
+    assert {r["match_mode"] for r in doc["daily_matches"]} == {"Ranked", "Unranked"}
+    # Day totals still add up, but one ranked row is now filed as unranked.
+    row = next(r for r in doc["hero_daily"] if r["match_mode"] == "Ranked")
+    row["match_mode"] = "Unranked"
+    with pytest.raises(summary.ValidationFailed, match="Ranked"):
+        summary.validate(doc, _curation_stub(doc), players_per_team=6)
+
+
 def _curation_stub(doc):
     from pipeline.curate import Curation
 

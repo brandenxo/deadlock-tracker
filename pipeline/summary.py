@@ -1,7 +1,8 @@
 """Assemble, validate and publish data/summary.json.
 
 Only sums are stored (wins, appearances, ...), never rates: the dashboard adds them up
-across the chosen days and divides once, which weights each day by its games.
+across the chosen days and match modes and divides once, which weights each day by its
+games. Schema 2 splits every counter by match_mode (Ranked, Unranked).
 
 Validation happens before the single atomic write, so a failed run leaves the
 previous summary untouched.
@@ -17,7 +18,7 @@ from pipeline.curate import Curation
 from pipeline.heroes import heroes_for
 
 SUMMARY_KEY = "data/summary.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class ValidationFailed(Exception):
@@ -60,7 +61,9 @@ def build_summary(
         },
         "players_per_team": contract.PLAYERS_PER_TEAM,
         "daily_matches": [
-            {"date": d, "eligible_matches": curation.daily_matches.get(d, 0)} for d in covered
+            {"date": d, "match_mode": mode, "eligible_matches": n}
+            for d in covered
+            for mode, n in sorted(curation.daily_matches.get(d, {}).items())
         ],
         "hero_daily": hero_daily,
         "heroes": heroes_for({r["hero_id"] for r in hero_daily}, known_heroes),
@@ -75,20 +78,26 @@ def build_summary(
 def validate(summary: dict, curation: Curation, players_per_team: int) -> None:
     """Raise ValidationFailed if the totals don't add up."""
     problems = []
-    matches = {r["date"]: r["eligible_matches"] for r in summary["daily_matches"]}
-    for d, n in matches.items():
-        if n == 0:
+    matches = {
+        (r["date"], r["match_mode"]): r["eligible_matches"] for r in summary["daily_matches"]
+    }
+    for d in summary["coverage"]["covered_dates"]:
+        if not any(n for (day, _), n in matches.items() if day == d):
             problems.append(f"{d}: covered but has no eligible matches")
-        rows = [r for r in summary["hero_daily"] if r["date"] == d]
+    # Checked per (date, mode), including hero rows whose mode has no match count.
+    keys = set(matches) | {(r["date"], r["match_mode"]) for r in summary["hero_daily"]}
+    for d, mode in sorted(keys):
+        n = matches.get((d, mode), 0)
+        rows = [r for r in summary["hero_daily"] if (r["date"], r["match_mode"]) == (d, mode)]
         apps = sum(r["appearances"] for r in rows)
         wins = sum(r["wins"] for r in rows)
         # Two full teams and one winner per match fix both totals exactly.
         if apps != n * 2 * players_per_team:
-            problems.append(f"{d}: {apps} appearances for {n} matches")
+            problems.append(f"{d} {mode}: {apps} appearances for {n} matches")
         if wins != n * players_per_team:
-            problems.append(f"{d}: {wins} wins for {n} matches")
+            problems.append(f"{d} {mode}: {wins} wins for {n} matches")
     unknown = sum(v.get("unknown_enum_value", 0) for v in curation.exclusions.values())
-    total = sum(curation.daily_matches.values()) + sum(
+    total = sum(n for modes in curation.daily_matches.values() for n in modes.values()) + sum(
         n for v in curation.exclusions.values() for n in v.values()
     )
     if total and unknown / total > contract.MAX_UNKNOWN_ENUM_SHARE:

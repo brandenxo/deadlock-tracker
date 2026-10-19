@@ -103,10 +103,11 @@ SELECT
 FROM deduped d
 JOIN curated_matches m USING (match_id);          -- N:1 join, no row fan-out
 
--- Daily per-hero sums. Rates are derived later, never stored.
+-- Daily per-hero sums, split by match mode. Rates are derived later, never stored.
 CREATE OR REPLACE TABLE hero_daily AS
 SELECT
     m.match_date_utc,
+    m.match_mode,
     p.hero_id,
     COUNT(*)                                                    AS appearances,
     COUNT(*) FILTER (WHERE p.won)                               AS wins,
@@ -115,4 +116,4 @@ SELECT
     COUNT(DISTINCT p.match_id)                                  AS matches_with_hero
 FROM curated_participants p
 JOIN curated_matches m USING (match_id)
-GROUP BY m.match_date_utc, p.hero_id;
+GROUP BY m.match_date_utc, m.match_mode, p.hero_id;

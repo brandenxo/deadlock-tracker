@@ -52,32 +52,44 @@ accepts integer codes and integer epochs, and stops the run on anything else.
 - **Pick rate** = Σ matches with the hero / Σ eligible matches.
 - **Average length** = Σ duration of valid-duration appearances / their count.
 - **Tier** = from the 95% Wilson interval of the win rate, for heroes with ≥ 100 games.
+- **Match mode filter:** each sum is over the chosen mode's rows; "All matches" sums both.
 - A zero denominator is shown as "—", never 0%.
 
-## `data/summary.json` (schema_version 1)
+## `data/summary.json` (schema_version 2)
 
-Abbreviated from the live summary on 2026-10-19, built before the settle lag moved to
-24 hours (one day, one hero shown):
+Schema 2 splits every counter by `match_mode` (`Ranked` or `Unranked`): `daily_matches`
+has one row per (date, mode), and `hero_daily` one per (date, mode, hero). Validation
+checks 12 appearances and 6 wins per match for each mode separately. The dashboard still
+reads schema 1, which has no `match_mode`, and hides the mode toggle for it.
+
+Abbreviated from a local run over real data on 2026-10-19 (one day, one hero shown):
 
 ```json
 {
-  "schema_version": 1,
-  "built_at": "2026-10-19T13:45:22Z",
-  "source": { "manifest_version": 859, "manifest_generated_at": "2026-10-19T13:40:02Z" },
+  "schema_version": 2,
+  "built_at": "2026-10-19T15:05:31Z",
+  "source": { "manifest_version": 860, "manifest_generated_at": "2026-10-19T14:15:54Z" },
   "coverage": {
-    "settle_lag_hours": 6.0,
-    "status_by_date": { "2026-10-16": "partial", "2026-10-17": "covered", "2026-10-18": "covered", "...": "..." },
-    "covered_dates": ["2026-10-17", "2026-10-18"],
+    "settle_lag_hours": 24.0,
+    "status_by_date": { "2026-10-16": "partial", "2026-10-17": "covered", "2026-10-18": "partial", "...": "..." },
+    "covered_dates": ["2026-10-17"],
     "gap_minutes_by_date": { "2026-10-17": 8 }
   },
   "players_per_team": 6,
-  "daily_matches": [{ "date": "2026-10-17", "eligible_matches": 104765 }],
-  "hero_daily": [{ "date": "2026-10-17", "hero_id": 1, "appearances": 34513, "wins": 17213,
-                   "duration_sum_s": 76074176, "duration_count": 34513, "matches_with_hero": 34513 }],
+  "daily_matches": [
+    { "date": "2026-10-17", "match_mode": "Ranked", "eligible_matches": 18084 },
+    { "date": "2026-10-17", "match_mode": "Unranked", "eligible_matches": 80856 }
+  ],
+  "hero_daily": [
+    { "date": "2026-10-17", "match_mode": "Ranked", "hero_id": 1, "appearances": 6937, "wins": 3383,
+      "duration_sum_s": 15050426, "duration_count": 6937, "matches_with_hero": 6937 },
+    { "date": "2026-10-17", "match_mode": "Unranked", "hero_id": 1, "appearances": 25598, "wins": 12848,
+      "duration_sum_s": 56665290, "duration_count": 25598, "matches_with_hero": 25598 }
+  ],
   "heroes": { "1": { "name": "Infernus", "type": "marksman", "image": "https://assets-bucket.deadlock-api.com/..." } },
-  "excluded_matches": { "incomplete_roster": 247, "ineligible_game_mode": 38462,
-                        "ineligible_match_mode": 2532, "no_playing_winner": 6, "not_scored": 33 },
-  "quality": { "source_rows": 6445544, "won_flag_disagreements": 0 }
+  "excluded_matches": { "incomplete_roster": 113, "ineligible_game_mode": 20311,
+                        "ineligible_match_mode": 1380, "no_playing_winner": 2, "not_scored": 21 },
+  "quality": { "source_rows": 5340636, "won_flag_disagreements": 0 }
 }
 ```
 

@@ -49,7 +49,19 @@ def totals(hero_daily):
 
 def test_counters_equal_hand_calculation(result):
     assert totals(result.hero_daily) == HAND_TOTALS
-    assert result.daily_matches == {"2026-10-10": 2, "2026-10-11": 4}
+    assert result.daily_matches == {
+        "2026-10-10": {"Ranked": 1, "Unranked": 1},
+        "2026-10-11": {"Ranked": 4},
+    }
+
+
+def test_counters_split_by_match_mode(result):
+    # The only unranked match is 1002: one 2v2, so 4 appearances and 2 wins.
+    unranked = [r for r in result.hero_daily if r["match_mode"] == "Unranked"]
+    assert {r["date"] for r in unranked} == {"2026-10-10"}
+    assert sum(r["appearances"] for r in unranked) == 4
+    assert sum(r["wins"] for r in unranked) == 2
+    assert {r["match_mode"] for r in result.hero_daily} == {"Ranked", "Unranked"}
 
 
 def test_each_excluded_match_gets_its_first_failing_reason(con, result):

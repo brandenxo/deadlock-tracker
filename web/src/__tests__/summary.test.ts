@@ -9,7 +9,7 @@ describe("heroTotals", () => {
   it("weights a multi-day win rate by games, not by averaging daily rates", () => {
     const abrams = heroTotals(summary, both).find((r) => r.hero_id === 6)!;
     expect(abrams.win_rate).toBe(90 / 150); // 60%
-    const daily = (80 / 120 + 10 / 30) / 2; // 50%: the wrong answer
+    const daily = (80 / 120 + 10 / 30) / 2; // unweighted mean, 50%: incorrect
     expect(abrams.win_rate).not.toBeCloseTo(daily);
   });
 

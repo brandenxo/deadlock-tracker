@@ -1,4 +1,4 @@
-"""Manifest parsing, schema checks, download planning, and the HTTP client's limits."""
+"""Manifest parsing, schema checks, download planning, HTTP client limits."""
 
 import json
 from pathlib import Path
@@ -29,11 +29,11 @@ def test_real_manifest_excerpt_parses(manifest):
     kinds = {f.kind for f in manifest.files("match_player")}
     assert kinds == {"base", "residual", "delta"}
     delta = next(f for f in manifest.files("match_player") if f.kind == "delta")
-    assert delta.lo < delta.hi  # epoch seconds of created_at
+    assert delta.lo < delta.hi  # created_at bounds, epoch seconds
 
 
 def test_contract_types_match_the_real_manifest(manifest):
-    check_schema(manifest, "match_player", contract.EXPECTED_MANIFEST_TYPES)  # no raise
+    check_schema(manifest, "match_player", contract.EXPECTED_MANIFEST_TYPES)  # passes
 
 
 def test_schema_change_stops_the_run(manifest):
@@ -62,15 +62,15 @@ def test_plan_takes_newest_unheld_deltas_until_the_cap():
     m = _manifest_with([_delta(h) for h in range(10)] + [{"key": "b", "kind": "base",
                         "rows": 9, "bytes": 1}])  # fmt: skip
     plan = plan_ingest(m, "t", held_keys={"d9"}, cap_bytes=250, window_start=3 * 3600)
-    assert [f.key for f in plan.to_download] == ["d8", "d7"]  # d9 held; base never fetched
-    assert [f.key for f in plan.skipped_for_cap] == ["d6", "d5", "d4", "d3"]  # next runs
+    assert [f.key for f in plan.to_download] == ["d8", "d7"]  # d9 already held; base files skipped
+    assert [f.key for f in plan.skipped_for_cap] == ["d6", "d5", "d4", "d3"]  # deferred
     assert plan.planned_bytes == 200
 
 
 def test_plan_ignores_deltas_before_the_window():
     m = _manifest_with([_delta(h) for h in range(5)])
     plan = plan_ingest(m, "t", set(), cap_bytes=10_000, window_start=3 * 3600)
-    assert {f.key for f in plan.to_download} == {"d3", "d4"}  # d2 ends exactly at the start
+    assert {f.key for f in plan.to_download} == {"d3", "d4"}  # d2's hi equals window start
 
 
 def _client(tmp_path):

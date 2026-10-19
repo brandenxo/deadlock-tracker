@@ -1,15 +1,15 @@
-"""One pipeline run, end to end. Same code locally (LocalStore) and in Lambda (S3Store).
+"""A full pipeline run. Works against LocalStore or S3Store unchanged.
 
-    manifest -> check schema -> download new deltas (capped) -> rebuild the 7-day window
-    from ALL held raw objects -> coverage -> curated Parquet -> hero names -> summary
+    manifest -> schema check -> capped download of new deltas -> rebuild the window
+    from every held object -> coverage -> curated Parquet -> hero names -> summary
     -> validate -> publish
 
-Why rebuild the whole window every hour instead of updating incrementally? The window
-is small (seconds of DuckDB work), and a rebuild from raw evidence is correct no matter
-which runs failed, retried, or delivered the same rows twice.
+The window is recomputed from raw each time rather than patched. It's only seconds of
+work, and the output then depends only on what's held, not on run history (retries,
+failures, duplicate deliveries).
 
-Concurrency: Lambda's reserved concurrency is 1 (infra/lambda.tf), so two runs can
-never overlap. Locally, don't start two at once.
+Runs must not overlap. Lambda enforces that with reserved concurrency 1; locally it's
+up to you.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ CURATED_PREFIX = "curated/"
 
 
 def log(event: str, **fields) -> None:
-    """One JSON object per line: CloudWatch Logs Insights can filter on any field."""
+    """Print a single-line JSON event (queryable in Logs Insights)."""
     print(json.dumps({"event": event, **fields}, default=str), flush=True)
 
 
@@ -52,13 +52,13 @@ def run_once(
     own_workdir = workdir is None
     workdir = workdir or Path(tempfile.mkdtemp(prefix="deadlock-"))
     try:
-        # 1. What does the source contain right now?
+        # Manifest: what the source offers now.
         raw_manifest = client.fetch_manifest()
         manifest = parse_manifest(raw_manifest)
         check_schema(manifest, contract.TABLE, contract.EXPECTED_MANIFEST_TYPES)
         ingest.save_manifest(store, raw_manifest, manifest)
 
-        # 2. Download only objects we don't already hold.
+        # Fetch whatever we don't have yet.
         dates = coverage.window_dates(int(now.timestamp()), settings.window_days)
         window_start = coverage.day_start(dates[0])
         held = {p.source_key for p in ingest.held_objects(store)}
@@ -70,7 +70,7 @@ def run_once(
         )
         log("ingested", new_objects=len(new), bytes=downloaded, deferred=len(plan.skipped_for_cap))
 
-        # 3. Rebuild the window from every held object that overlaps it.
+        # Recompute the window from all held objects that overlap it.
         objects = [p for p in ingest.held_objects(store) if p.hi > window_start]
         paths = []
         for p in objects:
@@ -84,7 +84,7 @@ def run_once(
         missing = coverage.missing_seconds(intervals, dates, settings.settle_lag_s)
         result = curate.curate(con, [d.isoformat() for d in dates], players_per_team)
 
-        # 4. Hero names are cosmetic: a failure here is logged, never fatal.
+        # Names are optional; log and continue on failure.
         try:
             known = heroes.parse_heroes(
                 client.fetch_small(settings.heroes_url, heroes.HEROES_MAX_BYTES)
@@ -93,7 +93,7 @@ def run_once(
             log("heroes_unavailable", error=str(exc))
             known = {}
 
-        # 5. Validate, then publish. Nothing user-facing changes if validation fails.
+        # Validate before any write, so a bad run publishes nothing.
         doc = summary.build_summary(
             built_at=now,
             manifest=manifest,
@@ -124,7 +124,7 @@ def run_once(
 
 
 def replace_curated(store, con, out_dir: Path) -> None:
-    """Upload this run's curated Parquet and remove files from dates no longer in it."""
+    """Sync curated/ to this run's output, deleting dates that aged out."""
     new_keys = set()
     for path in curate.write_curated(con, out_dir):
         key = CURATED_PREFIX + path.relative_to(out_dir.resolve()).as_posix()

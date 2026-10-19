@@ -3,8 +3,7 @@ import type { Role } from "../types";
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
-// A row of toggle buttons: "All" plus one per role. aria-pressed tells screen readers
-// which one is on, the same way the CSS shows it.
+// Role toggles ("All" + one per role). aria-pressed drives both styling and a11y state.
 export function RoleFilter({ role, onChange }: { role: Role | null; onChange: (role: Role | null) => void }) {
   return (
     <div className="roles" role="group" aria-label="Hero role">

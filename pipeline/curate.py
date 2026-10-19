@@ -1,10 +1,8 @@
-"""Raw projected rows (source types) -> deduplicated, validated, typed tables.
+"""Turn stored raw rows into clean, typed tables and daily hero counters.
 
-1. load every held rows.parquet into one view (union by column name);
-2. normalize physical types, because the real Parquet encoding of enums and times is
-   undocumented and may differ between objects;
-3. run sql/curate.sql: dedup, exclusions, additive daily counters;
-4. keep only matches whose UTC start date is inside the window.
+Steps: read all held rows.parquet files as one relation (columns matched by name),
+coerce each column to one canonical type (files may encode enums/times differently),
+run sql/curate.sql, then drop anything whose UTC match date is outside the window.
 """
 
 from __future__ import annotations
@@ -26,23 +24,23 @@ INTEGER_TYPES = {
 
 
 def connect(workdir: Path) -> duckdb.DuckDBPyConnection:
-    """DuckDB set up for Lambda: writable dirs under /tmp, no runtime extension downloads."""
+    """Open DuckDB with writable dirs under workdir and extension auto-install off."""
     (workdir / "duckdb_tmp").mkdir(parents=True, exist_ok=True)
     config = {
-        "home_directory": str(workdir),  # Lambda's HOME is read-only
-        "temp_directory": str(workdir / "duckdb_tmp"),  # spill here if memory runs out
+        "home_directory": str(workdir),  # HOME isn't writable on Lambda
+        "temp_directory": str(workdir / "duckdb_tmp"),  # spill target
         "autoload_known_extensions": False,
         "autoinstall_known_extensions": False,
     }
-    # DuckDB's default limit (80% of RAM) plus Python left little headroom before Lambda
-    # kills the run at its memory size. Cap it lower so big windows spill to /tmp instead.
+    # DuckDB defaults to 80% of RAM, which left the 3 GB function ~150 MB from an OOM
+    # kill. 60% leaves room for Python; larger windows spill to disk instead.
     lambda_mb = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
     if lambda_mb:
         config["memory_limit"] = f"{int(lambda_mb) * 6 // 10}MB"
     return duckdb.connect(config=config)
 
 
-# --- 1-2. load + normalize -----------------------------------------------------------
+# --- loading and type normalization ----------------------------------------------------
 
 
 def _base(duckdb_type: str) -> str:
@@ -53,7 +51,7 @@ def _epoch(column: str, t: str) -> str:
     if _base(t) in INTEGER_TYPES:
         return f'CAST("{column}" AS BIGINT)'
     if _base(t).startswith("TIMESTAMP"):
-        return f'CAST(epoch("{column}") AS BIGINT)'  # naive TIMESTAMP is read as UTC
+        return f'CAST(epoch("{column}") AS BIGINT)'  # naive timestamps are UTC
     raise UnsupportedSchema(f"{column}: unsupported type {t}")
 
 
@@ -80,7 +78,7 @@ def _bool(column: str, t: str) -> str:
 
 
 def normalize_sql(types: dict[str, str]) -> str:
-    """SELECT list that turns raw_rows (any supported encoding) into canonical columns."""
+    """Build the SELECT list that maps raw_rows' physical types to canonical ones."""
     exprs = {
         "match_id": 'CAST("match_id" AS BIGINT)',
         "start_time": _epoch("start_time", types["start_time"]),
@@ -97,7 +95,7 @@ def normalize_sql(types: dict[str, str]) -> str:
 
 
 def load_raw(con: duckdb.DuckDBPyConnection, paths: list[Path]) -> None:
-    """Create table source_rows from raw Parquet files."""
+    """Load the given Parquet files into a normalized source_rows table."""
     if not paths:
         con.execute(
             "CREATE OR REPLACE TEMP TABLE source_rows (match_id BIGINT, start_time BIGINT, "
@@ -106,7 +104,7 @@ def load_raw(con: duckdb.DuckDBPyConnection, paths: list[Path]) -> None:
             "hero_id INTEGER, won BOOLEAN, created_at BIGINT)"
         )
         return
-    # Views can't take bound parameters; these are paths we created, quotes escaped anyway.
+    # DuckDB views can't bind parameters. Paths are our own, but quotes are escaped anyway.
     files = ", ".join("'" + p.as_posix().replace("'", "''") + "'" for p in paths)
     con.execute(
         f"CREATE OR REPLACE TEMP VIEW raw_rows AS "
@@ -121,18 +119,18 @@ def load_raw(con: duckdb.DuckDBPyConnection, paths: list[Path]) -> None:
     )
 
 
-# --- 3-4. curate ---------------------------------------------------------------------
+# --- curation ----------------------------------------------------------------------------
 
 
 def run_sql(con: duckdb.DuckDBPyConnection, players_per_team: int) -> None:
-    """Run sql/curate.sql against the source_rows table."""
+    """Execute sql/curate.sql statement by statement over source_rows."""
     params = {
         "players_per_team": players_per_team,
         "min_dur": contract.MIN_VALID_DURATION_S,
         "max_dur": contract.MAX_VALID_DURATION_S,
     }
-    # Drop whole-line comments first so a "$name" in a comment isn't taken as a parameter.
-    # The file has no ';' inside string literals, so splitting on ';' is safe here.
+    # Strip comment lines so "$name" in prose isn't bound as a parameter. Naive ';'
+    # splitting is fine because no string literal in the file contains one.
     lines = [ln for ln in SQL_FILE.read_text().splitlines() if not ln.lstrip().startswith("--")]
     for statement in filter(None, (s.strip() for s in "\n".join(lines).split(";"))):
         used = {k: v for k, v in params.items() if f"${k}" in statement}
@@ -142,9 +140,9 @@ def run_sql(con: duckdb.DuckDBPyConnection, players_per_team: int) -> None:
 @dataclass
 class Curation:
     source_rows: int
-    hero_daily: list[dict]  # date, hero_id, appearances, wins, duration_sum_s, ...
-    daily_matches: dict[str, int]  # date -> eligible matches
-    exclusions: dict[str, dict[str, int]]  # date -> reason -> matches
+    hero_daily: list[dict]  # one row per (date, hero)
+    daily_matches: dict[str, int]  # date -> eligible match count
+    exclusions: dict[str, dict[str, int]]  # date -> reason -> match count
     won_flag_disagreements: int
 
 
@@ -205,9 +203,9 @@ CURATED_TABLES = {
 
 
 def write_curated(con: duckdb.DuckDBPyConnection, out_dir: Path) -> list[Path]:
-    """Hive-partitioned Parquet: out_dir/<table>/match_date_utc=YYYY-MM-DD/part-0.parquet.
+    """Write curated tables as out_dir/<table>/match_date_utc=YYYY-MM-DD/part-0.parquet.
 
-    Athena reads these directly (infra/athena.tf) for ad-hoc questions."""
+    The date-partitioned layout is what Athena expects for ad-hoc SQL."""
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     for table, select in CURATED_TABLES.items():

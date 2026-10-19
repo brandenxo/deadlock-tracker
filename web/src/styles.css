@@ -1,25 +1,23 @@
 /*
-  Design: "Hero Ledger".
-  Deadlock is a 1920s occult New York where two teams fight: the Amber Hand and the
-  Sapphire Flame. We borrow those two colours for the only thing that needs colour:
-  above 50% is sapphire, below 50% is amber. Blue against orange also stays readable
-  for colour-blind viewers (checked with a palette validator in both themes).
-  Everything else is quiet: one condensed display face for headings and big numbers,
-  one plain face for the rest, thin rules instead of boxes.
+  Hero Ledger styles.
+  Color carries one meaning only: sapphire for above 50%, amber for below, after
+  Deadlock's two factions. That blue/orange pair also survives common color-vision
+  deficiencies (validated in both themes). Everything else is neutral: a condensed
+  display face for headings and figures, a plain text face, hairline rules over boxes.
 */
 
 /* ---- Tokens ------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
-  --page: #171a24; /* night sky over the city */
+  --page: #171a24; /* page background */
   --surface: #1f2330;
   --surface-raised: #272c3b;
   --rule: #343a4c;
-  --text: #ece6d8; /* lamplit paper */
+  --text: #ece6d8; /* primary text */
   --text-secondary: #aaa69c;
-  --brass: #c9a96a; /* the only decorative colour */
-  --above: #4f8fe8; /* Sapphire Flame */
-  --below: #cc7f22; /* Amber Hand */
+  --brass: #c9a96a; /* accent, decoration only */
+  --above: #4f8fe8; /* win rate above 50% */
+  --below: #cc7f22; /* win rate below 50% */
   --track: #2d3243;
   --grid: #2b3040;
   --axis: #6b7184;
@@ -29,7 +27,7 @@
   --font-body: "Barlow", system-ui, sans-serif;
 }
 
-/* Light theme: for people who set their system to light. Same roles, new values. */
+/* Light theme: same tokens, different values, following the OS preference. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
@@ -78,7 +76,7 @@ body {
   background: var(--page);
   color: var(--text);
   font: 400 16px/1.5 var(--font-body);
-  font-variant-numeric: tabular-nums; /* digits line up in columns */
+  font-variant-numeric: tabular-nums; /* fixed-width digits */
 }
 
 h1,
@@ -149,7 +147,7 @@ main {
 .masthead h1 {
   font-size: clamp(56px, 9vw, 104px);
   letter-spacing: 0.01em;
-  /* The one ornament: a brass rule under the title, like a ledger's header line. */
+  /* Accent underline on the title. */
   padding-bottom: 8px;
   border-bottom: 3px solid var(--brass);
   display: inline-block;
@@ -220,7 +218,7 @@ select {
   border: 1px solid var(--rule);
   border-radius: 4px;
   padding: 8px 10px;
-  min-height: 44px; /* comfortable touch target */
+  min-height: 44px; /* min touch target */
 }
 
 .link {
@@ -306,9 +304,9 @@ select {
 .tier-letter {
   font: 800 56px/1 var(--font-display);
   width: 52px;
+  flex: none; /* fixed width keeps letters aligned across rows */
   text-align: center;
-  /* The letter itself is text, so it keeps the text colour; a bar beside it carries
-     the sapphire/amber meaning. */
+  /* Letter stays text-colored for contrast; the side bar carries the tier color. */
   border-left: 6px solid var(--track);
   padding-left: 6px;
 }
@@ -538,7 +536,7 @@ th[aria-sort="descending"] .sort {
 }
 
 .winrate-track::after {
-  /* the 50% line */
+  /* 50% marker */
   content: "";
   position: absolute;
   left: 50%;
@@ -720,7 +718,7 @@ th[aria-sort="descending"] .sort {
   .layout {
     grid-template-columns: 1fr;
   }
-  /* On a phone the selected hero's panel comes first, then the table. */
+  /* Mobile: hero panel above the table. */
   .panel {
     position: static;
     order: -1;

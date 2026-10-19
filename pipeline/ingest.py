@@ -1,12 +1,11 @@
-"""Copy the columns we need from new source objects into our raw store.
+"""Download new source objects and store the kept columns under raw/.
 
-    raw/manifests/v<version>-<sha12>.json   exact manifest bytes, for debugging later
-    raw/objects/<id>/rows.parquet           13 projected columns, source types kept
-    raw/objects/<id>/provenance.json        written LAST: marks the object complete
+    raw/manifests/v<version>-<sha12>.json   manifest as fetched, for debugging
+    raw/objects/<id>/rows.parquet           kept columns, original source types
+    raw/objects/<id>/provenance.json        written last; its presence = complete
 
-<id> is a hash of the source key. Keys name immutable objects, so "have we got this
-key?" is all the bookkeeping we need. Holding the same rows twice is harmless:
-curation deduplicates rows on (match_id, player_slot).
+<id> hashes the source key. Source keys are immutable, so a key we already hold never
+needs fetching again. Overlapping rows across objects are fine; curation dedups them.
 """
 
 from __future__ import annotations
@@ -50,7 +49,7 @@ def save_manifest(store, raw: bytes, manifest: Manifest) -> None:
 
 
 def held_objects(store) -> list[Provenance]:
-    """Every complete raw object (one with provenance.json)."""
+    """Provenance for every fully stored object."""
     return [
         Provenance(**json.loads(store.get_bytes(key)))
         for key in store.list_keys(OBJECTS_PREFIX)
@@ -59,7 +58,7 @@ def held_objects(store) -> list[Provenance]:
 
 
 def project_columns(source: Path, out: Path) -> tuple[int, dict]:
-    """Keep only contract.SOURCE_COLUMNS, in the source's own types. Returns (rows, types)."""
+    """Write contract.SOURCE_COLUMNS (unconverted) to out; return (row count, types)."""
     con = duckdb.connect()
     try:
         types = dict(
@@ -92,7 +91,7 @@ def ingest(
     workdir: Path,
     cap_bytes: int,
 ) -> tuple[list[Provenance], int]:
-    """Download, project and store each file. Returns (new objects, bytes downloaded)."""
+    """Fetch, trim and store each file; return (provenance list, bytes downloaded)."""
     remaining = cap_bytes
     stored = []
     for f in files:
@@ -103,7 +102,7 @@ def ingest(
         try:
             rows, types = project_columns(download, projected)
         finally:
-            download.unlink(missing_ok=True)  # never keep whole source objects
+            download.unlink(missing_ok=True)  # full source files are never kept
         prov = Provenance(
             source_key=f.key,
             lo=f.lo,

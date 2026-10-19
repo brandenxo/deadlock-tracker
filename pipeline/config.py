@@ -1,5 +1,5 @@
-"""Runtime settings from environment variables. Defaults are safe for local runs;
-in Lambda, Terraform sets them (infra/lambda.tf). Nothing here is secret."""
+"""Settings read from DT_* environment variables, with local-friendly defaults.
+Lambda's values are set in infra/lambda.tf. No secrets live here."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class Settings:
     window_days: int = contract.WINDOW_DAYS
     settle_lag_s: int = contract.SETTLE_LAG_S
     max_gap_s: int = contract.MAX_COVERAGE_GAP_S
-    bucket: str = ""  # empty = local filesystem store
+    bucket: str = ""  # "" means use the local store
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> Settings:

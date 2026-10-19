@@ -1,8 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Dev: copy a locally built summary to public/data/summary.json (see README) and Vite
-// serves it at /data/summary.json, the same path CloudFront serves in production.
+// Local dev: drop a pipeline summary into public/data/summary.json and the dev server
+// exposes it at /data/summary.json, matching the production path.
 export default defineConfig({
   plugins: [react()],
   build: { assetsDir: "assets", sourcemap: false },

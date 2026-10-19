@@ -1,14 +1,13 @@
-# Two private buckets. Nothing is public: browsers reach data/summary.json and the site
-# only through CloudFront (cdn.tf).
+# Both buckets are private; all public reads go through CloudFront (cdn.tf).
 #
-#   data bucket: raw/            projected source objects (expire after the window)
-#                curated/        Parquet for ad-hoc Athena queries
-#                data/           summary.json, the only thing the dashboard reads
+#   data bucket: raw/            trimmed source objects, expired after the window
+#                curated/        date-partitioned Parquet for Athena
+#                data/           summary.json, the dashboard's only input
 #                athena-results/
-#   site bucket: the built React app
+#   site bucket: Vite build output
 #
-# Both live in the account regional namespace (names end in -<account>-<region>-an), so
-# no other AWS account can ever create a bucket with these names.
+# Names use the account-regional namespace (-<account>-<region>-an suffix), which
+# no other account can claim.
 
 resource "aws_s3_bucket" "data" {
   bucket           = local.data_bucket_name
@@ -18,7 +17,7 @@ resource "aws_s3_bucket" "data" {
 resource "aws_s3_bucket" "site" {
   bucket           = local.site_bucket_name
   bucket_namespace = "account-regional"
-  force_destroy    = true # rebuilt from source on every deploy
+  force_destroy    = true # contents are disposable build output
 }
 
 resource "aws_s3_bucket_public_access_block" "data" {

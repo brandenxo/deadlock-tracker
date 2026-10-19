@@ -1,18 +1,16 @@
-"""Which UTC dates can we honestly show?
+"""Decide which UTC dates have enough source data to publish.
 
-Each raw object holds rows the source ingested in [lo, hi). A match starting on date D
-is ingested some time after it starts, so D is:
+Raw objects carry the [lo, hi) range of source ingest times they contain. Rows for a
+match on day D keep arriving after D ends, so each D is judged over D + settle lag:
 
-* covered  - held intervals reach the end of D plus the settle lag, and the holes
-             inside that span add up to at most max_gap_s;
-* partial  - held intervals touch that span but don't cover it;
-* absent   - nothing held touches it.
+* covered  - held data reaches the end of that span, with at most max_gap_s missing
+* partial  - some data in the span, but not enough
+* absent   - none
 
-Only covered dates are published. A partial day would show real-looking but
-undercounted numbers, which is worse than showing nothing. The small tolerance exists
-because the source sometimes compacts a few minutes of hourly files into its huge base
-files, leaving a hole no download can fill; without it, that whole day could never be
-shown. Missing minutes per covered day are published so the page can say so.
+Only covered dates are published; an undercounted day looks plausible and misleads.
+The gap allowance exists because upstream occasionally folds a few minutes of hourly
+files into its multi-GB base files, which leaves a hole we can't fill. Missing minutes
+are reported in the summary.
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ DAY_S = 86_400
 
 
 def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Union of half-open intervals; touching ones ([a,b) and [b,c)) merge."""
+    """Merge half-open intervals; adjacent ones like [a,b) and [b,c) join."""
     merged: list[tuple[int, int]] = []
     for lo, hi in sorted(i for i in intervals if i[1] > i[0]):
         if merged and lo <= merged[-1][1]:
@@ -38,13 +36,13 @@ def day_start(d: date) -> int:
 
 
 def window_dates(now: int, window_days: int) -> list[date]:
-    """Today (UTC) and the window_days - 1 days before it, oldest first."""
+    """The last window_days UTC dates ending today, oldest first."""
     today = datetime.fromtimestamp(now, UTC).date()
     return [today - timedelta(days=n) for n in range(window_days - 1, -1, -1)]
 
 
 def _missing(merged: list[tuple[int, int]], need_lo: int, need_hi: int) -> int:
-    """Seconds of [need_lo, need_hi) that no merged interval holds."""
+    """Seconds of [need_lo, need_hi) not covered by merged."""
     held = sum(max(0, min(hi, need_hi) - max(lo, need_lo)) for lo, hi in merged)
     return (need_hi - need_lo) - held
 
@@ -52,7 +50,7 @@ def _missing(merged: list[tuple[int, int]], need_lo: int, need_hi: int) -> int:
 def missing_seconds(
     intervals: list[tuple[int, int]], dates: list[date], settle_lag_s: int
 ) -> dict[str, int]:
-    """Per date: seconds of the day plus the settle lag that the held intervals miss."""
+    """Missing seconds per date over the day plus settle lag."""
     merged = merge_intervals(intervals)
     return {
         d.isoformat(): _missing(merged, day_start(d), day_start(d) + DAY_S + settle_lag_s)
@@ -68,8 +66,8 @@ def classify(
     for d in dates:
         need_lo = day_start(d)
         need_hi = need_lo + DAY_S + settle_lag_s
-        # The end must be held (the settle lag is never shortened); holes may not exceed
-        # max_gap_s in total.
+        # Require data through the end of the settle lag; only interior holes count
+        # against max_gap_s.
         reaches_end = any(lo < need_hi <= hi for lo, hi in merged)
         if reaches_end and _missing(merged, need_lo, need_hi) <= max_gap_s:
             status[d.isoformat()] = "covered"

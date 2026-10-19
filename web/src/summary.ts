@@ -1,5 +1,4 @@
-// Load data/summary.json and turn its daily counters into the numbers the UI shows.
-// The browser reads one static file from its own origin: no API, no credentials.
+// Fetches data/summary.json (same origin, static) and derives the per-hero numbers.
 import { tierOf, wilson } from "./stats";
 import type { HeroDaily, HeroInfo, HeroRow, SeriesPoint, Summary, UtcDate } from "./types";
 
@@ -11,7 +10,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// TypeScript types vanish at runtime; check the parts the UI depends on.
+// Runtime shape check: the static types can't validate fetched JSON.
 export function parseSummary(body: unknown): Summary {
   if (!isObject(body) || body.schema_version !== 1) throw new LoadError("Unsupported data format.");
   const coverage = body.coverage;
@@ -37,7 +36,7 @@ export async function fetchSummary(signal?: AbortSignal): Promise<Summary | null
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new LoadError("Could not reach the server. Check your connection and retry.");
   }
-  // S3 behind CloudFront answers 403 for a missing object: nothing published yet.
+  // A missing object comes back as 403 through OAC; treat it as "not published yet".
   if (response.status === 403 || response.status === 404) return null;
   if (!response.ok) throw new LoadError(`The server answered ${response.status}.`);
   return parseSummary(await response.json());
@@ -85,7 +84,7 @@ export function eligibleMatches(summary: Summary, dates: UtcDate[]): number {
     .reduce((total, d) => total + d.eligible_matches, 0);
 }
 
-// One row per hero, totals over `dates`.
+// Per-hero totals across `dates`.
 export function heroTotals(summary: Summary, dates: UtcDate[]): HeroRow[] {
   const wanted = new Set(dates);
   const byHero = new Map<number, HeroDaily[]>();
@@ -97,7 +96,7 @@ export function heroTotals(summary: Summary, dates: UtcDate[]): HeroRow[] {
   return [...byHero].map(([heroId, rows]) => toRow(heroInfo(summary, heroId), heroId, rows, matches));
 }
 
-// One point per covered date, for one hero. Days the hero wasn't played get null rates.
+// Daily series for one hero over all covered dates; unplayed days have null rates.
 export function heroSeries(summary: Summary, heroId: number): SeriesPoint[] {
   return summary.coverage.covered_dates.map((date) => {
     const rows = summary.hero_daily.filter((r) => r.date === date && r.hero_id === heroId);

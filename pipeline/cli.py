@@ -1,8 +1,8 @@
-"""Local commands.
+"""Command-line entry point for local runs.
 
 uv run python -m pipeline.cli synth --out data/synth --start 2026-10-05T00 --hours 48
 uv run python -m pipeline.cli run --source data/synth --now 2026-10-07T06:30:00Z
-uv run python -m pipeline.cli run                       # real source, capped download
+uv run python -m pipeline.cli run                       # live source, default cap
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.cap_mb:
         settings = dataclasses.replace(settings, download_cap_bytes=args.cap_mb * 1_000_000)
     if args.source:
-        # A synthetic source has no hero API, so use the small hero list in fixtures/.
+        # No hero API offline; fall back to the bundled fixture list.
         base = args.source.resolve().as_uri()
         client = SourceClient(base, f"{base}/v1/manifest.json")
         settings = dataclasses.replace(settings, heroes_url=FIXTURE_HEROES.as_uri())

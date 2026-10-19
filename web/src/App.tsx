@@ -22,8 +22,8 @@ type Load =
   | { state: "error"; message: string }
   | { state: "ready"; summary: Summary };
 
-// Fetch the summary once (and again on retry). The AbortController cancels a request
-// that's still running if the component goes away, so we never set state on it.
+// Loads the summary on mount and on each retry. Aborts in-flight requests on unmount
+// so a late response can't update a gone component.
 function useSummary(): [Load, () => void] {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -67,7 +67,7 @@ function Dashboard({ summary }: { summary: Summary }) {
   const dates = useMemo(() => datesBetween(summary, range.from, range.to), [summary, range]);
   const all = useMemo(() => heroTotals(summary, dates), [summary, dates]);
   const rows = useMemo(() => (role ? all.filter((r) => r.type === role) : all), [all, role]);
-  // Start on the most-played hero so the panel is never empty on first load.
+  // Default selection: most-played hero in view.
   const mostPlayed = [...rows].sort((a, b) => b.appearances - a.appearances || a.hero_id - b.hero_id)[0];
   const hero = rows.find((r) => r.hero_id === selected) ?? mostPlayed;
   const matches = eligibleMatches(summary, dates);

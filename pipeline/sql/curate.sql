@@ -1,12 +1,12 @@
--- Curate projected match_player rows and build additive daily hero counters.
--- Input:  table source_rows with canonical types (built by pipeline/curate.py):
---         match_id BIGINT, start_time/created_at BIGINT epoch seconds (UTC),
---         enums as label strings ('UNKNOWN' for unrecognised values),
---         not_scored/won BOOLEAN, player_slot/hero_id/duration_s INTEGER.
--- Params: $players_per_team, $min_dur, $max_dur.
--- Output: tables curated_matches, curated_participants, match_exclusions, hero_daily.
+-- Dedup, filter and aggregate match_player rows into per-day hero counters.
+-- Reads:   source_rows, already normalized by pipeline/curate.py:
+--          match_id BIGINT, start_time/created_at BIGINT (UTC epoch seconds),
+--          enums as labels ('UNKNOWN' when unrecognized),
+--          not_scored/won BOOLEAN, player_slot/hero_id/duration_s INTEGER.
+-- Params:  $players_per_team, $min_dur, $max_dur.
+-- Writes:  curated_matches, curated_participants, match_exclusions, hero_daily.
 
--- 1. Row-level dedup: one row per (match_id, player_slot), newest created_at wins.
+-- Dedup: keep the latest created_at per (match_id, player_slot).
 CREATE OR REPLACE TEMP TABLE ranked_rows AS
 SELECT *,
        ROW_NUMBER() OVER w AS rn,
@@ -14,7 +14,7 @@ SELECT *,
 FROM source_rows
 WINDOW w AS (PARTITION BY match_id, player_slot ORDER BY created_at DESC);
 
--- Two *different* rows sharing the newest created_at are ambiguous.
+-- A tie on the latest created_at between rows that differ can't be resolved.
 CREATE OR REPLACE TEMP TABLE ambiguous_matches AS
 SELECT DISTINCT match_id
 FROM (
@@ -29,7 +29,7 @@ HAVING COUNT(*) > 1;
 CREATE OR REPLACE TEMP TABLE deduped AS
 SELECT * EXCLUDE (rn, newest_created_at) FROM ranked_rows WHERE rn = 1;
 
--- 2. One row per match with every exclusion check evaluated.
+-- Per-match facts needed by the exclusion rules.
 CREATE OR REPLACE TEMP TABLE match_checks AS
 SELECT
     match_id,
@@ -51,7 +51,7 @@ SELECT
 FROM deduped
 GROUP BY match_id;
 
--- First failing check wins, so every excluded match has exactly one reason.
+-- Checks run in order and the first hit is recorded, so reasons never double count.
 CREATE OR REPLACE TABLE match_exclusions AS
 SELECT match_id, start_time,
        CAST(to_timestamp(start_time) AT TIME ZONE 'UTC' AS DATE) AS match_date_utc,
@@ -77,8 +77,8 @@ FROM (
 )
 WHERE reason IS NOT NULL;
 
--- 3. Curated tables. Grain: curated_matches = one row per match;
---    curated_participants = one row per (match_id, player_slot).
+-- Clean tables: curated_matches has one row per match,
+-- curated_participants one per (match_id, player_slot).
 CREATE OR REPLACE TABLE curated_matches AS
 SELECT
     c.match_id,
@@ -87,7 +87,7 @@ SELECT
     c.duration_s,
     (c.duration_s BETWEEN $min_dur AND $max_dur) AS duration_valid,
     c.winning_team,
-    c.match_mode                                  -- Ranked or Unranked, for Athena questions
+    c.match_mode                                  -- kept for ad-hoc ranked/unranked queries
 FROM match_checks c
 WHERE c.match_id NOT IN (SELECT match_id FROM match_exclusions);
 
@@ -97,13 +97,13 @@ SELECT
     d.player_slot,
     d.team,
     d.hero_id,
-    (d.team = m.winning_team) AS won,             -- derived from match-level truth
+    (d.team = m.winning_team) AS won,             -- from the match winner, not the row flag
     (d.won IS DISTINCT FROM (d.team = m.winning_team)) AS won_flag_disagrees,
-    m.match_date_utc                              -- copied for partitioning/pruning
+    m.match_date_utc                              -- duplicated for date partitioning
 FROM deduped d
-JOIN curated_matches m USING (match_id);          -- many participants -> one match: safe
+JOIN curated_matches m USING (match_id);          -- N:1 join, no row fan-out
 
--- 4. Additive daily counters. Never store a ratio here.
+-- Daily per-hero sums. Rates are derived later, never stored.
 CREATE OR REPLACE TABLE hero_daily AS
 SELECT
     m.match_date_utc,

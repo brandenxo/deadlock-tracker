@@ -1,4 +1,4 @@
-"""End-to-end runs against a SYNTHETIC source, locally and against mocked S3."""
+"""Full runs over a fake source, with a local store and with mocked S3."""
 
 import dataclasses
 import json
@@ -37,7 +37,7 @@ def test_run_publishes_only_covered_dates(tmp_path, source):
     assert doc["coverage"]["status_by_date"]["2026-10-07"] == "partial"
     assert {r["date"] for r in doc["hero_daily"]} == {"2026-10-05", "2026-10-06"}
     assert outcome["new_objects"] > 0
-    assert "account_id" not in json.dumps(doc)  # player identity is never read
+    assert "account_id" not in json.dumps(doc)  # no player ids anywhere
     assert doc["heroes"]["6"]["name"] == "Abrams"
     assert set(doc["heroes"]) == {str(r["hero_id"]) for r in doc["hero_daily"]}
 
@@ -88,7 +88,7 @@ def test_validation_catches_counters_that_do_not_add_up(tmp_path, source):
     store = LocalStore(tmp_path / "data")
     run_once(SETTINGS, store, source, now=NOW)
     doc = read_summary(store)
-    doc["hero_daily"][0]["wins"] += 1  # one extra win breaks "one winning team per match"
+    doc["hero_daily"][0]["wins"] += 1  # wins no longer match one winner per match
     with pytest.raises(summary.ValidationFailed, match="wins"):
         summary.validate(doc, _curation_stub(doc), players_per_team=6)
 

@@ -25,7 +25,7 @@ describe("tierOf", () => {
   it("rates by how sure we are, not just by the win rate", () => {
     expect(tierOf(5400, 10000)).toBe("S");
     expect(tierOf(5150, 10000)).toBe("A");
-    expect(tierOf(515, 1000)).toBe("B"); // the same 51.5%, but too few games to call it
+    expect(tierOf(515, 1000)).toBe("B"); // same rate, interval still includes 50%
     expect(tierOf(4850, 10000)).toBe("C");
     expect(tierOf(4600, 10000)).toBe("D");
   });

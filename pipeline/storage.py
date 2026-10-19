@@ -1,7 +1,7 @@
-"""One small storage interface, two backends: a local directory and an S3 bucket.
+"""Key/value file storage with a local-directory backend and an S3 backend.
 
-The pipeline relies on one S3 property: a single PutObject is atomic, so a reader of
-data/summary.json sees either the old file or the new one, never half of each.
+Both make single writes atomic, so readers of data/summary.json never see a
+half-written file.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ class LocalStore:
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(f".{target.name}.tmp")
         tmp.write_bytes(data)
-        os.replace(tmp, target)  # atomic, like an S3 put
+        os.replace(tmp, target)  # atomic rename
 
     def get_bytes(self, key: str) -> bytes:
         path = self._path(key)
@@ -52,7 +52,7 @@ class LocalStore:
 class S3Store:
     def __init__(self, bucket: str, client=None):
         if client is None:
-            import boto3  # lazy: local runs never need AWS configuration
+            import boto3  # imported here so local runs don't need AWS
 
             client = boto3.client("s3")
         self.bucket = bucket
@@ -86,6 +86,6 @@ class S3Store:
         return sorted(keys)
 
     def delete_keys(self, keys: list[str]) -> None:
-        for start in range(0, len(keys), 1000):  # DeleteObjects takes at most 1,000 keys
+        for start in range(0, len(keys), 1000):  # API limit per DeleteObjects call
             batch = [{"Key": k} for k in keys[start : start + 1000]]
             self.s3.delete_objects(Bucket=self.bucket, Delete={"Objects": batch, "Quiet": True})

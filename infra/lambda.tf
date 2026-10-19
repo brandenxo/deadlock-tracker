@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_group" "pipeline" {
   name              = "/aws/lambda/${var.project_name}-pipeline"
-  retention_in_days = 14 # Lambda's default would be "never expire"
+  retention_in_days = 14 # auto-created groups never expire
 }
 
 data "aws_iam_policy_document" "lambda_trust" {
@@ -18,7 +18,7 @@ resource "aws_iam_role" "pipeline" {
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
 }
 
-# Least privilege: its own log group, and only the prefixes it owns in the data bucket.
+# Scoped to its own log group and the data-bucket prefixes the pipeline writes.
 data "aws_iam_policy_document" "pipeline" {
   statement {
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
@@ -55,17 +55,17 @@ resource "aws_lambda_function" "pipeline" {
   function_name    = "${var.project_name}-pipeline"
   role             = aws_iam_role.pipeline.arn
   runtime          = "python3.12"
-  architectures    = ["x86_64"] # must match the wheels tools/build_lambda.sh downloads
+  architectures    = ["x86_64"] # matches the DuckDB wheel in the zip
   handler          = "pipeline.lambda_handler.handler"
   filename         = var.lambda_zip
   source_code_hash = filebase64sha256(var.lambda_zip)
 
-  memory_size = 3008 # DuckDB needs the RAM; CPU also scales with memory
+  memory_size = 3008 # memory also sets the CPU share
   timeout     = 600
   ephemeral_storage {
-    size = 4096 # /tmp holds the window's raw Parquet while DuckDB reads it
+    size = 4096 # raw Parquet and DuckDB spill space
   }
-  # Never two runs at once, so no locking code is needed.
+  # One run at a time; replaces any locking in the code.
   reserved_concurrent_executions = 1
 
   environment {
@@ -79,7 +79,7 @@ resource "aws_lambda_function" "pipeline" {
   depends_on = [aws_cloudwatch_log_group.pipeline, aws_iam_role_policy.pipeline]
 }
 
-# Scheduler invokes asynchronously. No automatic retries: the next hourly run is the retry.
+# Async invokes from the scheduler. Retries are off since the next hourly run does the same work.
 resource "aws_lambda_function_event_invoke_config" "pipeline" {
   function_name                = aws_lambda_function.pipeline.function_name
   maximum_retry_attempts       = 0

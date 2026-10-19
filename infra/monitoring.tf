@@ -1,6 +1,6 @@
-# Budgets only NOTIFY; they don't stop spending. The real limits are the download cap,
-# the Lambda timeout, reserved concurrency 1, and the Athena per-query scan cutoff.
-# (A spend limit in AWS Settings, if you set one, is the hard stop.)
+# Email-only cost alert; it doesn't cap anything. Actual guardrails: download cap,
+# Lambda timeout, concurrency 1, Athena scan cutoff, and any spend limit configured in
+# AWS Settings.
 resource "aws_budgets_budget" "monthly" {
   name         = "${var.project_name}-monthly"
   budget_type  = "COST"
@@ -35,8 +35,8 @@ resource "aws_sns_topic_subscription" "email" {
   endpoint  = var.alert_email
 }
 
-# Any failed run (source error, schema change, validation failure, timeout).
-# Find the cause in Logs Insights: filter event = "run_failed".
+# Fires on any failed invocation: source errors, schema drift, failed validation,
+# timeouts, OOM. Details are in the run_failed log events.
 resource "aws_cloudwatch_metric_alarm" "pipeline_errors" {
   alarm_name          = "${var.project_name}-pipeline-errors"
   namespace           = "AWS/Lambda"
@@ -51,9 +51,9 @@ resource "aws_cloudwatch_metric_alarm" "pipeline_errors" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
 }
 
-# The silent failure: nothing runs at all (schedule broken, function throttled), so there
-# are no errors to count. Alarm when there were no invocations for three hours. Only
-# while the schedule is on, or it would alarm the whole time it's deliberately off.
+# Catches the case the errors alarm can't: no invocations at all (schedule disabled or
+# broken, persistent throttling). Three empty hours trips it. Only exists while the
+# schedule is enabled, since otherwise silence is expected.
 resource "aws_cloudwatch_metric_alarm" "pipeline_not_running" {
   count               = var.schedule_enabled ? 1 : 0
   alarm_name          = "${var.project_name}-pipeline-not-running"
@@ -65,11 +65,11 @@ resource "aws_cloudwatch_metric_alarm" "pipeline_not_running" {
   evaluation_periods  = 3
   threshold           = 1
   comparison_operator = "LessThanThreshold"
-  treat_missing_data  = "breaching" # no data at all means no runs
+  treat_missing_data  = "breaching" # missing data = no runs
   alarm_actions       = [aws_sns_topic.alerts.arn]
 }
 
-# Saved Logs Insights query: every run outcome, newest first. One click in the console.
+# Saved Logs Insights query listing recent run outcomes.
 resource "aws_cloudwatch_query_definition" "runs" {
   name            = "${var.project_name}/runs"
   log_group_names = [aws_cloudwatch_log_group.pipeline.name]

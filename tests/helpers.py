@@ -1,4 +1,4 @@
-"""Shared test helpers."""
+"""Fixtures and builders used across test modules."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from pipeline.synthetic import SyntheticSpec, generate
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 FIXTURE = FIXTURES / "small_rows.csv"
 HEROES_FIXTURE = FIXTURES / "heroes.json"
-FIXTURE_PLAYERS_PER_TEAM = 2  # the hand-calculated fixture uses 2v2 to keep the math small
+FIXTURE_PLAYERS_PER_TEAM = 2  # 2v2 keeps hand-checked totals small
 
 
 def load_fixture(con: duckdb.DuckDBPyConnection, path: Path = FIXTURE) -> None:
-    """Load fixtures/small_rows.csv into source_rows with canonical types."""
+    """Populate source_rows from fixtures/small_rows.csv (already canonical types)."""
     con.execute(
         f"""
         CREATE OR REPLACE TEMP TABLE source_rows AS
@@ -40,11 +40,11 @@ def utc(text: str) -> datetime:
 
 
 START = utc("2026-10-05T00:00:00")
-NOW = utc("2026-10-07T06:30:00")  # 2026-10-05 and -06 covered (data ends 06:00 + tail)
+NOW = utc("2026-10-07T06:30:00")  # Oct 5 and 6 are complete at this point
 
 
 def make_source(root: Path, **overrides) -> dict:
-    """A SYNTHETIC source: 48 hours of matches starting 2026-10-05 00:00 UTC."""
+    """Fake source with 48 h of matches from 2026-10-05 00:00 UTC."""
     spec = SyntheticSpec(
         out_dir=root,
         start_epoch=int(START.timestamp()),

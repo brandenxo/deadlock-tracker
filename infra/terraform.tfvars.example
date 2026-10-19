@@ -1,4 +1,4 @@
-# Copy to terraform.tfvars (gitignored).
+# Template for terraform.tfvars (gitignored).
 alert_email      = "you@example.com"
-schedule_enabled = false # set true after the first manual run publishes a summary
-# domain_name    = "deadlock.example.com" # optional, see infra/domain.tf
+schedule_enabled = false # enable once a manual invoke has succeeded
+# domain_name    = "deadlock.example.com" # optional; see domain.tf

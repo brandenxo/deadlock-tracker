@@ -1,15 +1,14 @@
-"""What we read from the source, how we decode it, and which matches count.
+"""Source schema expectations, enum decoding, and match eligibility rules.
 
-Column names, types and enum codes come from the match_player schema in the public
-manifest (version 629, read 2026-10-12). How enums are physically stored in the
-Parquet files (integer codes or label strings) is not documented, so curation accepts
-both and rejects anything else.
+Names, types and enum codes mirror the match_player schema in manifest v629
+(checked 2026-10-12). The Parquet encoding of enums isn't documented: files may hold
+integer codes or label strings, so curation handles both and rejects anything else.
 """
 
 TABLE = "match_player"
 
-# The 13 columns we project out of ~150. account_id is deliberately never read:
-# hero-level stats need no player identity.
+# Columns kept from match_player (~150 total). account_id is intentionally absent;
+# nothing here is per-player.
 SOURCE_COLUMNS = [
     "match_id",
     "start_time",
@@ -60,8 +59,8 @@ def _enum_type(column: str) -> str:
     return f"Enum8({pairs})"
 
 
-# The manifest's type string for every projected column. A run stops before downloading
-# anything if the live manifest disagrees, instead of guessing at new semantics.
+# Exact manifest type strings for the kept columns. Any mismatch aborts the run before
+# downloads start; a changed type means the meaning may have changed too.
 EXPECTED_MANIFEST_TYPES = {
     "match_id": "UInt64",
     "start_time": "DateTime",
@@ -78,17 +77,17 @@ EXPECTED_MANIFEST_TYPES = {
     "created_at": "DateTime",
 }
 
-# Eligibility. 6 players per team is inferred from manifest row counts (mostly
-# multiples of 12); check it against real files before trusting the numbers.
+# Eligibility. Team size comes from observed data (row counts are mostly multiples
+# of 12), not from documentation.
 PLAYERS_PER_TEAM = 6
 MIN_VALID_DURATION_S = 1
-MAX_VALID_DURATION_S = 4 * 60 * 60  # sanity bound for the duration metric only
+MAX_VALID_DURATION_S = 4 * 60 * 60  # only gates the avg-length metric
 
-# Curated match_id is a signed BIGINT; the source is UInt64. Refuse, never wrap.
+# Source ids are UInt64 but curated tables use BIGINT; larger ids fail loudly.
 MAX_MATCH_ID = 2**63 - 1
 
-# Window and coverage.
+# Rebuild window and day-completeness rules.
 WINDOW_DAYS = 7
-SETTLE_LAG_S = 6 * 60 * 60  # rows can arrive after a match ends; wait this long past a day
-MAX_COVERAGE_GAP_S = 30 * 60  # holes in a day's source files tolerated before it's "partial"
-MAX_UNKNOWN_ENUM_SHARE = 0.01  # more novelty than this means the source changed meaning
+SETTLE_LAG_S = 6 * 60 * 60  # late rows keep arriving after midnight
+MAX_COVERAGE_GAP_S = 30 * 60  # total source hole allowed per day
+MAX_UNKNOWN_ENUM_SHARE = 0.01  # above this, assume the codes changed

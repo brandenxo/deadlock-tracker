@@ -1,11 +1,10 @@
-"""Build data/summary.json, check it, and publish it.
+"""Assemble, validate and publish data/summary.json.
 
-The summary holds only ADDITIVE daily counters (wins, appearances, ...). The dashboard
-sums them over the selected dates and divides once, so a 3-day win rate is
-total wins / total games, never the average of three daily percentages.
+Only sums are stored (wins, appearances, ...), never rates: the dashboard adds them up
+across the chosen days and divides once, which weights each day by its games.
 
-Publishing is one PutObject, which S3 makes atomic. Validation runs first, so a bad
-run leaves yesterday's good summary in place.
+Validation happens before the single atomic write, so a failed run leaves the
+previous summary untouched.
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ def build_summary(
     missing_s: dict[str, int] | None = None,
 ) -> dict:
     covered = sorted(d for d, s in coverage.items() if s == "covered")
-    # Covered days can still have small source holes (coverage.py); minutes, rounded up.
+    # Allowed upstream holes on covered days, in whole minutes (rounded up).
     gaps = missing_s or {}
     gap_minutes = {d: -(-gaps[d] // 60) for d in covered if gaps.get(d, 0) > 0}
     hero_daily = [r for r in curation.hero_daily if r["date"] in covered]
@@ -74,7 +73,7 @@ def build_summary(
 
 
 def validate(summary: dict, curation: Curation, players_per_team: int) -> None:
-    """Invariants that must hold before anything is published."""
+    """Raise ValidationFailed if the totals don't add up."""
     problems = []
     matches = {r["date"]: r["eligible_matches"] for r in summary["daily_matches"]}
     for d, n in matches.items():
@@ -83,7 +82,7 @@ def validate(summary: dict, curation: Curation, players_per_team: int) -> None:
         rows = [r for r in summary["hero_daily"] if r["date"] == d]
         apps = sum(r["appearances"] for r in rows)
         wins = sum(r["wins"] for r in rows)
-        # Every eligible match has exactly 2 full teams and exactly one winning team.
+        # Two full teams and one winner per match fix both totals exactly.
         if apps != n * 2 * players_per_team:
             problems.append(f"{d}: {apps} appearances for {n} matches")
         if wins != n * players_per_team:
@@ -100,5 +99,5 @@ def validate(summary: dict, curation: Curation, players_per_team: int) -> None:
 
 def publish(store, summary: dict) -> None:
     body = (json.dumps(summary, separators=(",", ":"), sort_keys=True) + "\n").encode()
-    # Short cache: CloudFront and browsers re-check every minute; runs are hourly.
+    # 60 s cache: fresh enough for hourly updates, still absorbs traffic bursts.
     store.put_bytes(SUMMARY_KEY, body, "application/json", cache_control="public, max-age=60")

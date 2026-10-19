@@ -3,12 +3,12 @@ import { count, duration, pct, ROLE_LABELS } from "../format";
 import type { HeroRow, SeriesPoint } from "../types";
 import { HeroAvatar } from "./HeroAvatar";
 
-// The chart library is most of the JavaScript; load it only when a hero panel shows.
+// Recharts dominates bundle size, so the chart is code-split.
 const TrendChart = lazy(() =>
   import("./TrendChart").then((module) => ({ default: module.TrendChart })),
 );
 
-// Everything about the selected hero over the selected dates, plus their daily trend.
+// Detail view for the selected hero: headline rate, interval, stats, daily trend.
 export function HeroPanel({ hero, series }: { hero: HeroRow; series: SeriesPoint[] }) {
   return (
     <aside className="panel" aria-labelledby="panel-title">

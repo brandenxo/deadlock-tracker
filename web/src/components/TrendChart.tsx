@@ -11,10 +11,10 @@ import {
 import type { SeriesPoint } from "../types";
 import { count, duration, pct } from "../format";
 
-// One hero, one measure, one axis: win rate per covered UTC date.
-//  * The axis spans at least 40-60%: win rates sit near 50%, so 0-100% draws a flat line.
-//  * Sample size isn't drawn on a second axis (two axes invite false correlations); it's
-//    in the tooltip and in the table below, which is also the screen-reader view.
+// Daily win rate for one hero.
+//  * Y axis covers at least 40-60%; a full 0-100% scale would flatten the line.
+//  * Game counts live in the tooltip and the table, not a second axis. The table also
+//    serves as the accessible version of the chart.
 
 interface TooltipProps {
   active?: boolean;
@@ -38,8 +38,7 @@ function PointTooltip({ active, payload }: TooltipProps) {
 }
 
 export function TrendChart({ name, series }: { name: string; series: SeriesPoint[] }) {
-  // Recharts skips null values, leaving a visible gap for days with no appearances
-  // instead of drawing a fake 0% point.
+  // null leaves a gap in the line for days without games, rather than plotting 0%.
   const data = series.map((p) => ({ ...p, win_rate_pct: p.win_rate === null ? null : p.win_rate * 100 }));
   return (
     <figure className="trend">

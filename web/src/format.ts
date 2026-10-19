@@ -1,4 +1,4 @@
-// Display formatting. null always renders as an em dash: "not computable" is not 0%.
+// Number formatting for the UI. Missing values render as "—", never as 0.
 export const MISSING = "—";
 const integer = new Intl.NumberFormat("en-US");
 
@@ -22,7 +22,7 @@ export function age(hours: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-// "± 1.2" : half the width of the 95% range, in percentage points.
+// Half-width of the 95% interval in percentage points, e.g. "± 1.2".
 export function margin(low: number | null, high: number | null): string {
   return low === null || high === null ? MISSING : `± ${(((high - low) / 2) * 100).toFixed(1)}`;
 }

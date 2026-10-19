@@ -1,13 +1,11 @@
-// How sure are we about a win rate? 52% over 50 games and 52% over 50,000 games are
-// very different claims. The Wilson score interval gives the range the true win rate
-// probably lies in (95% of the time), and the tier is read from that range.
+// Win-rate uncertainty. The same percentage means much less over 50 games than over
+// 50,000, so tiers are assigned from a 95% Wilson interval rather than the point value.
 
 export const Z95 = 1.96;
 export const MIN_GAMES_FOR_TIER = 100;
 
-// Wilson score interval for `wins` successes out of `games` trials.
-// Better than the textbook p +- 1.96*sqrt(p(1-p)/n): it never leaves [0, 1] and
-// behaves well for small samples and for rates near 0% or 100%.
+// 95% Wilson score interval for wins/games. Unlike the normal approximation it stays
+// within [0, 1] and holds up at small n and extreme rates.
 export function wilson(wins: number, games: number, z = Z95): { low: number; high: number } | null {
   if (games === 0) return null;
   const p = wins / games;
@@ -17,8 +15,8 @@ export function wilson(wins: number, games: number, z = Z95): { low: number; hig
   return { low: Math.max(0, center - margin), high: Math.min(1, center + margin) };
 }
 
-// S: even the pessimistic end is 52%+     A: clearly above 50%
-// B: can't tell it apart from 50%         C: clearly below 50%    D: even the optimistic end is under 48%
+// S: lower bound >= 52%     A: lower bound > 50%     B: interval contains 50%
+// C: upper bound < 50%      D: upper bound < 48%
 export function tierOf(wins: number, games: number): "S" | "A" | "B" | "C" | "D" | null {
   if (games < MIN_GAMES_FOR_TIER) return null;
   const range = wilson(wins, games)!;

@@ -1,12 +1,12 @@
-# Your own domain (optional): set domain_name in terraform.tfvars.
+# Optional custom domain, enabled by setting domain_name in terraform.tfvars.
 #
-# CloudFront only accepts certificates from AWS Certificate Manager (ACM) in us-east-1,
-# whatever Region the rest of the stack uses, hence the aliased provider. The project's
-# Region policy allows ACM there for exactly this reason; nothing else is created in it.
-# ACM proves you own the domain with a DNS record: `terraform apply` prints it
-# (dns_validation_records), you add it at your DNS provider (Cloudflare, with the proxy
-# OFF), and the apply waits until ACM sees it. Certificates from ACM are free and renew
-# themselves as long as that record stays in place.
+# CloudFront requires its ACM certificate in us-east-1, so this file uses a second
+# provider pinned there. The project's Region SCP explicitly allows acm:* in us-east-1;
+# nothing else is created in that Region.
+#
+# Validation is DNS-based and the zone lives in Cloudflare, not Route 53: add the CNAME
+# from the dns_validation_records output there (proxy off) and the apply waits for it.
+# Keep that record; ACM renews the certificate through it.
 
 provider "aws" {
   alias  = "us_east_1"
@@ -27,7 +27,7 @@ resource "aws_acm_certificate" "site" {
   validation_method = "DNS"
 
   lifecycle {
-    create_before_destroy = true # a renamed domain gets its new cert before the old goes
+    create_before_destroy = true # no HTTPS gap when the domain changes
   }
 }
 
@@ -35,7 +35,7 @@ resource "aws_acm_certificate_validation" "site" {
   count           = local.use_domain ? 1 : 0
   provider        = aws.us_east_1
   certificate_arn = aws_acm_certificate.site[0].arn
-  # No validation_record_fqdns: the DNS record lives outside AWS, so just wait for ACM.
+  # Record lives in Cloudflare, so there are no FQDNs to pass; this only waits.
   timeouts {
     create = "2h"
   }

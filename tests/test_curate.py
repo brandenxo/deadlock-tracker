@@ -1,8 +1,8 @@
-"""Curation correctness, checked against numbers calculated by hand.
+"""Curation results compared with hand-computed expectations.
 
-fixtures/small_rows.csv is 9 tiny 2v2 matches over two UTC days, each one built to
-exercise one rule (duplicates, a corrected outcome, an errored match, ...). The
-expected values below were worked out on paper before the SQL was written.
+fixtures/small_rows.csv holds nine 2v2 matches across two UTC days; each targets a
+single rule (duplicate rows, a corrected winner, an errored match, ...). The expected
+numbers were derived manually, independent of the SQL.
 """
 
 import duckdb
@@ -62,7 +62,7 @@ def test_each_excluded_match_gets_its_first_failing_reason(con, result):
 
 
 def test_duplicates_collapse_and_corrections_win(con, result):
-    # 1003 slot 0 was delivered twice; 1005 was re-delivered with the winner corrected.
+    # 1003/slot 0 arrives twice; 1005 arrives again with a corrected winner.
     assert con.execute("SELECT COUNT(*) FROM curated_participants").fetchone()[0] == 24
     winner = con.execute(
         "SELECT winning_team FROM curated_matches WHERE match_id = 1005"
@@ -75,13 +75,13 @@ def test_late_evening_match_is_bucketed_by_utc_start_date(con, result):
     day = con.execute(
         "SELECT strftime(match_date_utc, '%Y-%m-%d') FROM curated_matches WHERE match_id = 1002"
     ).fetchone()[0]
-    assert day == "2026-10-10"  # started 23:30 UTC, ingested after midnight
+    assert day == "2026-10-10"  # 23:30 start, arrived after midnight
 
 
 def test_ambiguous_duplicate_excludes_the_whole_match(tmp_path):
     con = curate.connect(tmp_path)
     load_fixture(con)
-    # Same key, same created_at, different content: we can't know which is right.
+    # Conflicting rows with identical key and created_at: no way to pick one.
     con.execute(
         "INSERT INTO source_rows SELECT * REPLACE (7 AS hero_id) FROM source_rows "
         "WHERE match_id = 1001 AND player_slot = 0"
@@ -92,7 +92,7 @@ def test_ambiguous_duplicate_excludes_the_whole_match(tmp_path):
 
 
 def test_joining_participants_before_counting_inflates_matches(con, result):
-    """The classic fan-out bug: COUNT(*) after a join counts players, not matches."""
+    """Guard against fan-out: COUNT(*) over the joined rows gives players, not matches."""
     wrong = con.execute(
         "SELECT COUNT(*) FROM curated_matches JOIN curated_participants USING (match_id)"
     ).fetchone()[0]

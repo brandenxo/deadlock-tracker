@@ -1,7 +1,7 @@
 resource "aws_scheduler_schedule" "hourly" {
   name = "${var.project_name}-hourly"
-  # :45 past each hour. The source's hourly export (files ending around :15) shows up in
-  # its manifest at about :35, so :45 picks it up the same hour.
+  # Hourly at :45. Upstream's hourly file (ending ~:15) lands in the manifest around
+  # :35; running at :15 would always be an hour behind.
   schedule_expression          = "cron(45 * * * ? *)"
   schedule_expression_timezone = "UTC"
   state                        = var.schedule_enabled ? "ENABLED" : "DISABLED"
@@ -14,7 +14,7 @@ resource "aws_scheduler_schedule" "hourly" {
     arn      = aws_lambda_function.pipeline.arn
     role_arn = aws_iam_role.scheduler.arn
     retry_policy {
-      maximum_retry_attempts = 2 # retries delivery only, not a failed run
+      maximum_retry_attempts = 2 # delivery retries, not run retries
     }
   }
 }
@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "scheduler_trust" {
       type        = "Service"
       identifiers = ["scheduler.amazonaws.com"]
     }
-    condition { # only schedules in this account may use the role
+    condition { # confused-deputy guard
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]

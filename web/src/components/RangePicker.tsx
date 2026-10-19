@@ -1,6 +1,6 @@
 import type { UtcDate } from "../types";
 
-// Only covered dates are offered, so a range can never include a partial day.
+// Options are limited to covered dates, so partial days can't be selected.
 export function RangePicker({
   covered,
   from,

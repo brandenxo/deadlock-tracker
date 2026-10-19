@@ -1,13 +1,13 @@
-# One CloudFront distribution, one origin per bucket, both private via Origin Access
-# Control. The dashboard and its data share an origin, so there is no CORS and no API.
-#   /          -> site bucket (the React build)
-#   /data/*    -> data bucket, and ONLY that prefix (bucket policy below)
+# CloudFront in front of both private buckets (Origin Access Control). Serving the app
+# and its data from one hostname avoids CORS entirely.
+#   /          -> site bucket
+#   /data/*    -> data bucket, restricted to data/ by its bucket policy
 #
-# CloudFront is a global service, so it is allowed even though every Regional resource
-# stays in the project's selected Region. The buckets it reads from are in var.region.
+# CloudFront is global, so it's permitted despite the single-Region project policy;
+# both origins live in var.region.
 
 locals {
-  # AWS managed cache policy "CachingOptimized": honours each object's Cache-Control.
+  # Managed "CachingOptimized" policy: TTLs follow each object's Cache-Control header.
   caching_optimized = "658327ea-f89d-4fab-a63d-7e88639e58f6"
 }
 
@@ -33,7 +33,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       override                   = true
     }
     content_security_policy {
-      # Hero portraits come from the Deadlock API's image bucket; everything else is ours.
+      # Only external origin: hero portraits from the Deadlock API's asset bucket.
       content_security_policy = "default-src 'self'; img-src 'self' data: https://assets-bucket.deadlock-api.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
       override                = true
     }
@@ -44,7 +44,7 @@ resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   default_root_object = "index.html"
   aliases             = local.use_domain ? [var.domain_name] : [] # domain.tf
-  price_class         = "PriceClass_100"                          # North America + Europe edges: cheapest
+  price_class         = "PriceClass_100"                          # NA + EU edges, cheapest
 
   origin {
     origin_id                = "site"
@@ -75,7 +75,7 @@ resource "aws_cloudfront_distribution" "main" {
     allowed_methods            = ["GET", "HEAD"]
     cached_methods             = ["GET", "HEAD"]
     compress                   = true
-    cache_policy_id            = local.caching_optimized # summary.json says max-age=60
+    cache_policy_id            = local.caching_optimized # summary.json sets max-age=60
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
@@ -85,7 +85,7 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # Without a domain: the free *.cloudfront.net certificate. With one: ours (domain.tf).
+  # Default *.cloudfront.net cert, or the ACM cert from domain.tf when a domain is set.
   viewer_certificate {
     cloudfront_default_certificate = !local.use_domain
     acm_certificate_arn            = local.use_domain ? aws_acm_certificate_validation.site[0].certificate_arn : null
@@ -94,7 +94,7 @@ resource "aws_cloudfront_distribution" "main" {
   }
 }
 
-# Bucket policies: only this distribution may read, and plain HTTP is refused.
+# Bucket policies: reads only from this distribution, and TLS required for everything.
 data "aws_iam_policy_document" "site_bucket" {
   statement {
     actions   = ["s3:GetObject"]
@@ -128,7 +128,7 @@ data "aws_iam_policy_document" "site_bucket" {
 data "aws_iam_policy_document" "data_bucket" {
   statement {
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.data.arn}/data/*"] # never raw/ or curated/
+    resources = ["${aws_s3_bucket.data.arn}/data/*"] # raw/ and curated/ stay private
     principals {
       type        = "Service"
       identifiers = ["cloudfront.amazonaws.com"]

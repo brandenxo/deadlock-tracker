@@ -1,4 +1,4 @@
-"""Hero metadata: parse the API's shape defensively, fall back to "Hero <id>"."""
+"""Hero list parsing: tolerate junk entries, default to "Hero <id>"."""
 
 import json
 from pathlib import Path
@@ -28,7 +28,7 @@ def test_junk_entries_are_skipped_and_only_https_images_kept():
     heroes = parse_heroes(raw)
     assert set(heroes) == {1, 2}
     assert heroes[1]["image"] == "https://x/1.png"
-    assert heroes[2]["image"] is None  # a page served over https can't load http images
+    assert heroes[2]["image"] is None  # http images would be blocked on an https page
 
 
 def test_unknown_ids_get_a_placeholder_name():

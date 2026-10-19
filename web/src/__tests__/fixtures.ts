@@ -4,8 +4,8 @@ const day = (date: string, hero_id: number, appearances: number, wins: number,
   duration_sum_s: number, duration_count: number): HeroDaily =>
   ({ date, hero_id, appearances, wins, duration_sum_s, duration_count, matches_with_hero: appearances });
 
-// Two covered days. Abrams (6) is played a lot, Bebop (15) some, Haze (13) rarely and
-// never with a valid duration.
+// Two covered days: Abrams (6) heavily played, Bebop (15) moderately, Haze (13) barely
+// and only in matches without a valid duration.
 export function summaryFixture(overrides: Partial<Summary> = {}): Summary {
   return {
     schema_version: 1,

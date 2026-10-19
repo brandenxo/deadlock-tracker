@@ -1,10 +1,10 @@
-"""SYNTHETIC source: a fake data-lake directory shaped like the real one.
+"""Generate a fake source directory for offline development and tests.
 
-Everything here is invented, so the pipeline can be developed and tested offline.
-The SHAPE follows the real source (manifest, hourly created_at deltas, 12 rows per
-match, late rows, duplicates, corrections); the VALUES mean nothing about Deadlock.
+Layout and quirks match the real data lake (manifest, hourly created_at deltas,
+12 rows per match, late arrivals, duplicates, corrected winners). The numbers are
+random and say nothing about the actual game.
 
-Two physical encodings, because the real one is undocumented:
+Both plausible Parquet encodings are supported, since the real one isn't documented:
   "int"   - enums as UTINYINT codes, times as UINTEGER epoch seconds
   "label" - enums as VARCHAR labels, times as TIMESTAMP
 """
@@ -21,24 +21,24 @@ import duckdb
 
 from pipeline import contract
 
-# Real hero ids (the heroes in fixtures/heroes.json), so the demo shows real names.
+# Ids from fixtures/heroes.json, so offline runs still get real names.
 HERO_IDS = [6, 7, 10, 11, 12, 13, 14, 15, 19, 25, 27, 31, 35, 52, 64, 69]
-COPRIME_STEPS = [1, 3, 5, 7, 9, 11, 13, 15]  # odd steps visit all 16 slots before repeating
-# A small invented edge per hero (from -1.2 to +1.2 points), so the demo isn't all 50 %.
+COPRIME_STEPS = [1, 3, 5, 7, 9, 11, 13, 15]  # coprime with 16: each step cycles every slot
+# Made-up per-hero bias (-1.2 to +1.2 points) so fake win rates aren't flat at 50%.
 STRENGTH = {h: ((i * 7) % 13 - 6) * 0.002 for i, h in enumerate(HERO_IDS)}
 
 
 @dataclass(frozen=True)
 class SyntheticSpec:
     out_dir: Path
-    start_epoch: int  # first match start time
-    hours: int  # hours of match starts to generate
+    start_epoch: int  # earliest match start
+    hours: int  # span of match starts
     matches_per_hour: int = 40
     first_match_id: int = 114_000_000
     seed: float = 0.42
     encoding: str = "int"
     manifest_version: int = 900
-    tail_hours: int = 6  # deltas continue this long after the last match start
+    tail_hours: int = 6  # extra delta hours after the last start
 
 
 def _stamp(epoch: int) -> str:
@@ -46,7 +46,7 @@ def _stamp(epoch: int) -> str:
 
 
 def _enum_sql(column: str, encoding: str, value_sql: str) -> str:
-    """value_sql yields a label; convert to the requested physical encoding."""
+    """Wrap a label-producing expression in the chosen physical encoding."""
     if encoding == "label":
         return f"{value_sql} AS {column}"
     codes = {label: code for code, label in contract.ENUMS[column].items()}
@@ -61,10 +61,10 @@ def _time_sql(column: str, encoding: str, value_sql: str) -> str:
 
 
 def generate(spec: SyntheticSpec) -> dict:
-    """Write manifest.json + delta Parquet files under spec.out_dir. Returns the manifest."""
+    """Write a manifest and delta Parquet files to spec.out_dir; return the manifest."""
     if spec.encoding not in ("int", "label"):
         raise ValueError("encoding must be 'int' or 'label'")
-    con = duckdb.connect(config={"threads": 1})  # single thread => deterministic random()
+    con = duckdb.connect(config={"threads": 1})  # 1 thread keeps random() reproducible
     con.execute("SELECT setseed(?)", [spec.seed])
     n = spec.hours * spec.matches_per_hour
     span = spec.hours * 3600
@@ -96,7 +96,7 @@ def generate(spec: SyntheticSpec) -> dict:
                      WHEN r_mode < 0.55 THEN 'Ranked' ELSE 'Unranked' END AS match_mode,
                 CASE WHEN r_outcome < 0.02 THEN 'Error' ELSE 'TeamWin' END AS match_outcome,
                 (r_score < 0.005) AS not_scored,
-                -- typical source lag ~30 min after the match ends; 2% arrive 1-3 days late
+                -- ~30 min after the match ends usually, 1-3 days for 2% of rows
                 CAST(start_time + duration_s + 120 + floor(-ln(1 - r_lag) * 1800)
                      + CASE WHEN r_late < 0.02 THEN 86400 + floor(r_late * 100 * 86400) ELSE 0 END
                      AS BIGINT) AS created_at,
@@ -111,9 +111,9 @@ def generate(spec: SyntheticSpec) -> dict:
                    list_extract({hero_ids}, 1 + ((hero_offset + s.slot * hero_step)
                                                % {len(HERO_IDS)})) AS hero_id
             FROM base b CROSS JOIN range(12) s(slot)
-            WHERE NOT (r_drop < 0.01 AND s.slot = 11)          -- 1% incomplete rosters
+            WHERE NOT (r_drop < 0.01 AND s.slot = 11)          -- drop a player in 1% of matches
         ),
-        edges AS (  -- Team0's summed hero strength minus Team1's
+        edges AS (  -- strength difference, Team0 minus Team1
             SELECT match_id,
                    SUM(CASE team WHEN 'Team0' THEN st.strength ELSE -st.strength END) AS edge
             FROM seated JOIN (VALUES {strengths}) st(hero_id, strength) USING (hero_id)
@@ -125,7 +125,7 @@ def generate(spec: SyntheticSpec) -> dict:
             FROM seated JOIN edges USING (match_id)
         ),
         first_delivery AS (
-            -- 1% of matches are first delivered with the WRONG winner, then corrected.
+            -- 1%: first delivered with the wrong winner, fixed in a later row.
             SELECT *, CASE WHEN r_fix < 0.01
                            THEN CASE true_winner WHEN 'Team0' THEN 'Team1' ELSE 'Team0' END
                            ELSE true_winner END AS winning_team
@@ -136,7 +136,7 @@ def generate(spec: SyntheticSpec) -> dict:
             FROM players WHERE r_fix < 0.01
         ),
         duplicates AS (
-            -- 1% of matches are delivered twice, identically (same created_at)
+            -- 1%: exact duplicate delivery (same created_at)
             SELECT *, true_winner AS winning_team FROM players
             WHERE r_fix >= 0.01 AND r_drop BETWEEN 0.5 AND 0.51
         )
@@ -148,7 +148,7 @@ def generate(spec: SyntheticSpec) -> dict:
               UNION ALL SELECT * FROM duplicates)
         """
     )
-    extra = ", CAST(1000 + player_slot AS UINTEGER) AS account_id"  # never read
+    extra = ", CAST(1000 + player_slot AS UINTEGER) AS account_id"  # ingest drops it
     select_physical = (
         ", ".join(
             [
@@ -171,7 +171,7 @@ def generate(spec: SyntheticSpec) -> dict:
     )
 
     first_lo = (spec.start_epoch // 3600) * 3600
-    # The "present moment" of this fake source: rows created later have not arrived yet.
+    # Treat this as "now" for the fake source; later rows don't exist yet.
     cutoff = ((spec.start_epoch + span) // 3600 + spec.tail_hours) * 3600
     delta_dir = spec.out_dir / "v1" / "tables" / "match_player" / "g2" / "delta"
     delta_dir.mkdir(parents=True, exist_ok=True)

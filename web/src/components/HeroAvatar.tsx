@@ -1,9 +1,8 @@
 import { useState } from "react";
 import type { HeroRow } from "../types";
 
-// The hero's portrait, or their initials if there's no image (or it fails to load).
-// alt="" because the name is always printed right next to it: a screen reader would
-// otherwise read every name twice.
+// Portrait with an initials fallback for missing or broken images. Decorative only
+// (alt="", aria-hidden): the name is always rendered beside it.
 export function HeroAvatar({ hero, size = "small" }: { hero: Pick<HeroRow, "name" | "image" | "type">; size?: "small" | "large" }) {
   const [broken, setBroken] = useState(false);
   const initials = hero.name

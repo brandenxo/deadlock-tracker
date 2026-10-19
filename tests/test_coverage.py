@@ -1,4 +1,4 @@
-"""Which dates are safe to publish."""
+"""Day completeness: interval merging, settle lag, gap allowance."""
 
 from datetime import date
 
@@ -23,7 +23,7 @@ def test_touching_intervals_merge_and_gaps_do_not():
 def test_a_day_is_covered_only_with_the_settle_lag_held():
     full = [(START + h * 3600, START + (h + 1) * 3600) for h in range(30)]  # day + 6 h
     assert classify(full, [D], LAG) == {"2026-10-10": "covered"}
-    assert classify(full[:-1], [D], LAG) == {"2026-10-10": "partial"}  # lag not yet held
+    assert classify(full[:-1], [D], LAG) == {"2026-10-10": "partial"}  # missing the final lag hour
 
 
 def test_a_one_hour_gap_makes_the_day_partial():
@@ -45,9 +45,9 @@ def test_window_is_today_and_the_previous_days_in_utc():
 
 
 def test_a_small_hole_is_tolerated_and_reported():
-    hole = 8 * 60  # like the source's real Oct 17 compaction hole
+    hole = 8 * 60  # same size as the real 2026-10-17 hole
     held = [(START, START + 15 * 3600), (START + 15 * 3600 + hole, START + DAY_S + LAG)]
-    assert classify(held, [D], LAG) == {"2026-10-10": "partial"}  # default: no tolerance
+    assert classify(held, [D], LAG) == {"2026-10-10": "partial"}  # strict by default
     assert classify(held, [D], LAG, max_gap_s=30 * 60) == {"2026-10-10": "covered"}
     assert missing_seconds(held, [D], LAG) == {"2026-10-10": hole}
 
@@ -62,5 +62,5 @@ def test_holes_add_up_against_the_tolerance():
 
 
 def test_the_settle_lag_end_is_never_tolerated():
-    held = [(START, START + DAY_S + LAG - 60)]  # one minute short of the end
+    held = [(START, START + DAY_S + LAG - 60)]  # ends 60 s early
     assert classify(held, [D], LAG, max_gap_s=30 * 60) == {"2026-10-10": "partial"}

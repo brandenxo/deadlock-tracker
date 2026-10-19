@@ -1,5 +1,5 @@
-# Copy to backend.hcl (gitignored). Create the state bucket once, by hand, in the
-# account regional namespace of the project's selected Region (us-east-2):
+# Template for backend.hcl (gitignored). The state bucket is created once, manually,
+# in the account-regional namespace for us-east-2:
 #   export AWS_PROFILE=deadlock-tracker
 #   ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 #   STATE_BUCKET=deadlock-tracker-tfstate-$ACCOUNT-us-east-2-an

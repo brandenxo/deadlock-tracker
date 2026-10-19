@@ -18,7 +18,7 @@ describe("HeroTable", () => {
     render(<HeroTable rows={rows} selected={15} onSelect={() => {}} />);
     expect(heroOrder()).toEqual(["Abrams", "Bebop", "Haze"]);
     expect(screen.getByRole("columnheader", { name: /Games/ })).toHaveAttribute("aria-sort", "descending");
-    expect(screen.getByLabelText("tier S")).toBeInTheDocument(); // Abrams: 90 of 150
+    expect(screen.getByLabelText("tier S")).toBeInTheDocument(); // 90/150 for Abrams
     expect(screen.getAllByText("Brawler")).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Bebop/ })).toHaveAttribute("aria-pressed", "true");
   });

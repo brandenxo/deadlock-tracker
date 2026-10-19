@@ -1,7 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-// Fonts are bundled with the site (no Google Fonts request), so the page needs nothing
-// from other origins except hero portraits.
+// Self-hosted fonts keep third-party requests down to the hero portraits.
 import "@fontsource/big-shoulders-display/latin-800";
 import "@fontsource/barlow/latin-400";
 import "@fontsource/barlow/latin-600";

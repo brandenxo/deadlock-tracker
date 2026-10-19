@@ -4,9 +4,8 @@ import { afterEach } from "vitest";
 
 afterEach(() => cleanup());
 
-// jsdom has no layout engine and no ResizeObserver. Recharts' ResponsiveContainer
-// needs the API to exist; with zero size it simply renders no SVG, which is why the
-// tests assert on the table view of the chart rather than on pixels.
+// jsdom lacks ResizeObserver, which Recharts' ResponsiveContainer requires. With no
+// layout the chart renders empty, so tests check its data table instead.
 class ResizeObserverStub {
   observe() {}
   unobserve() {}

@@ -17,7 +17,7 @@ CHUNK = 1024 * 1024
 
 
 class UnsupportedSchema(Exception):
-    """The source no longer matches the data contract. Stop rather than guess."""
+    """Raised when the source schema drifts from contract.py."""
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,7 @@ class SourceFile:
     kind: str  # snapshot | base | residual | delta
     rows: int
     bytes: int
-    lo: int | None  # created_at range [lo, hi), epoch seconds (deltas only)
+    lo: int | None  # half-open created_at range, epoch s; deltas only
     hi: int | None
 
 
@@ -35,7 +35,7 @@ class Manifest:
     version: int
     generated_at: str
     tables: dict
-    sha256: str  # identity of the exact bytes we read
+    sha256: str  # fingerprint of the raw manifest bytes
 
     def files(self, table: str) -> list[SourceFile]:
         return [
@@ -88,11 +88,8 @@ def plan_ingest(
     cap_bytes: int,
     window_start: int,
 ) -> IngestPlan:
-    """Pick delta files to download this run.
-
-    Pick files in the window that are not already held, newest first, until the next
-    one would exceed the cap. Older files wait for the next run.
-    """
+    """Choose this run's downloads: unheld deltas in the window, newest first, up to the
+    byte cap. Whatever doesn't fit is left for a later run."""
     wanted = [
         f
         for f in manifest.files(table)
@@ -118,10 +115,9 @@ class SourceError(Exception):
 
 
 class SourceClient:
-    """Stream objects with a byte cap and bounded retries.
+    """Stdlib-only HTTP client with byte caps and limited retries.
 
-    This client uses only the standard library. urllib understands file:// URLs, so
-    tests can point it at a synthetic directory.
+    Also accepts file:// URLs, which is how tests and offline runs use a synthetic source.
     """
 
     def __init__(
@@ -140,7 +136,7 @@ class SourceClient:
         return self.fetch_small(self.manifest_url, MANIFEST_MAX_BYTES)
 
     def fetch_small(self, url: str, max_bytes: int) -> bytes:
-        """GET a small document whole, refusing anything too big."""
+        """Fetch a small document into memory; error out past max_bytes."""
 
         def read(response) -> bytes:
             body = response.read(max_bytes + 1)
@@ -151,7 +147,7 @@ class SourceClient:
         return self._with_retries(url, read)
 
     def download(self, source_file: SourceFile, dest: Path, max_bytes: int) -> int:
-        """Write one object to dest, enforcing the byte cap and manifest size."""
+        """Stream one object to dest. Fails past max_bytes or on a size mismatch."""
 
         def stream(response) -> int:
             total = 0
@@ -171,7 +167,7 @@ class SourceClient:
         try:
             return self._with_retries(f"{self.base_url}/{source_file.key}", stream)
         except BaseException:
-            dest.unlink(missing_ok=True)  # never leave a partial file behind
+            dest.unlink(missing_ok=True)  # no half-written files
             raise
 
     def _with_retries(self, url: str, consume):

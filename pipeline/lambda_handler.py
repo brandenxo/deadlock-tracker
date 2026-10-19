@@ -1,7 +1,7 @@
-"""AWS Lambda entry point, invoked hourly by EventBridge Scheduler (infra/schedule.tf).
+"""Lambda entry point for the hourly scheduled run (infra/schedule.tf).
 
-Any exception fails the invocation, which the Lambda Errors alarm emails about. The
-previous summary keeps serving, and the next hourly run is the retry.
+Errors are logged and re-raised so the invocation counts as failed and trips the
+alarm. The last published summary stays up; the next scheduled run retries.
 """
 
 from __future__ import annotations

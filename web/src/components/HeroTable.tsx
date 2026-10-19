@@ -10,7 +10,7 @@ interface Column {
   key: SortKey;
   label: string;
   numeric: boolean;
-  firstDirection: Direction; // numbers start high-to-low; names start A-Z
+  firstDirection: Direction; // direction on first click
 }
 
 const COLUMNS: Column[] = [
@@ -21,8 +21,7 @@ const COLUMNS: Column[] = [
   { key: "avg_duration_s", label: "Avg length", numeric: true, firstDirection: "descending" },
 ];
 
-// Nulls go LAST in both directions (a missing ratio is not "smallest"), and ties break
-// by hero_id, so the order is always the same and tests can check it.
+// Nulls sort last regardless of direction; hero_id breaks ties so ordering is stable.
 export function sortHeroes(rows: HeroRow[], key: SortKey, direction: Direction): HeroRow[] {
   const sign = direction === "ascending" ? 1 : -1;
   return [...rows].sort((a, b) => {
@@ -36,8 +35,8 @@ export function sortHeroes(rows: HeroRow[], key: SortKey, direction: Direction):
   });
 }
 
-// A bar that grows right (sapphire) above 50% and left (amber) below it. The track
-// spans 40%..60%: real win rates sit near 50%, so a 0..100 scale would hide every bar.
+// Diverging bar centered on 50%: right/sapphire above, left/amber below. The track only
+// covers 40-60%, since that's where hero win rates actually fall.
 function WinRateCell({ row }: { row: HeroRow }) {
   if (row.win_rate === null) return <span className="muted">{pct(null)}</span>;
   const delta = Math.max(-0.1, Math.min(0.1, row.win_rate - 0.5));

@@ -1,11 +1,10 @@
-"""Hero names, roles and portraits, so the dashboard can say "Abrams", not "hero 6".
+"""Map hero_id to display name, role and portrait.
 
-The match data only has a numeric hero_id. The Deadlock API publishes the game's hero
-list at /v1/assets/heroes: one JSON object per hero with `id`, `name`, `hero_type`
-(brawler / marksman / mystic / assassin) and `images` (portrait URLs).
+match_player only carries numeric ids. Names come from the Deadlock API's
+/v1/assets/heroes list (`id`, `name`, `hero_type`, `images`).
 
-Names are cosmetic: if the list can't be fetched, the run still publishes, and the
-dashboard falls back to "Hero 6". Bad names must never block good numbers.
+This lookup is optional: if it fails, the run still publishes and the UI shows
+"Hero <id>" instead.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from __future__ import annotations
 import json
 
 HEROES_MAX_BYTES = 10_000_000
-IMAGE_KEYS = ("icon_image_small_webp", "icon_image_small")  # first one present wins
+IMAGE_KEYS = ("icon_image_small_webp", "icon_image_small")  # preference order
 
 
 def parse_heroes(raw: bytes) -> dict[int, dict]:

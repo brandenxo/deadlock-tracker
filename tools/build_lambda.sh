@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build build/pipeline.zip for AWS Lambda (Python 3.12, x86_64).
-# Works on macOS and Windows/WSL too: uv downloads the Linux wheel for DuckDB instead of
-# the one for your laptop. boto3 is not packaged; the Lambda runtime already has it.
+# Package build/pipeline.zip for the python3.12 x86_64 Lambda runtime.
+# uv fetches DuckDB's manylinux wheel, so this works from macOS without Docker.
+# boto3 is omitted because the runtime provides it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

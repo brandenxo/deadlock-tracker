@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,14 +28,18 @@ INTEGER_TYPES = {
 def connect(workdir: Path) -> duckdb.DuckDBPyConnection:
     """DuckDB set up for Lambda: writable dirs under /tmp, no runtime extension downloads."""
     (workdir / "duckdb_tmp").mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(
-        config={
-            "home_directory": str(workdir),  # Lambda's HOME is read-only
-            "temp_directory": str(workdir / "duckdb_tmp"),  # spill here if memory runs out
-            "autoload_known_extensions": False,
-            "autoinstall_known_extensions": False,
-        }
-    )
+    config = {
+        "home_directory": str(workdir),  # Lambda's HOME is read-only
+        "temp_directory": str(workdir / "duckdb_tmp"),  # spill here if memory runs out
+        "autoload_known_extensions": False,
+        "autoinstall_known_extensions": False,
+    }
+    # DuckDB's default limit (80% of RAM) plus Python left little headroom before Lambda
+    # kills the run at its memory size. Cap it lower so big windows spill to /tmp instead.
+    lambda_mb = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+    if lambda_mb:
+        config["memory_limit"] = f"{int(lambda_mb) * 6 // 10}MB"
+    return duckdb.connect(config=config)
 
 
 # --- 1-2. load + normalize -----------------------------------------------------------

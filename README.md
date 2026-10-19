@@ -1,5 +1,9 @@
 # deadlock-tracker
 
+[![ci](https://github.com/brandenxo/deadlock-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/brandenxo/deadlock-tracker/actions/workflows/ci.yml)
+
+**Live:** https://deadlock-tracker.brandenrivera.com
+
 Hourly hero statistics for Valve's *Deadlock*. A small Python pipeline pulls new match data
 from the public [deadlock-api.com](https://deadlock-api.com) data lake and aggregates it
 with DuckDB. It publishes one JSON summary that a static React dashboard (**Hero Ledger**)
@@ -15,6 +19,29 @@ data.deadlock-api.com ──▶ Lambda (Python + DuckDB) ──▶ S3 data bucke
                                                                          ▼
                                      browser ◀── CloudFront ◀── S3 site bucket (React app)
 ```
+
+There are no servers and no API: the dashboard is static files plus one JSON file that
+the pipeline rewrites every hour. The cleaned Parquet can also be queried with Athena.
+
+## Design decisions
+
+- **The manifest is the only source of truth.** Source files get replaced and compacted,
+  so the pipeline never lists a folder. It downloads only hourly `delta` files it doesn't
+  hold yet, and never the multi-gigabyte `base` files.
+- **Rebuild, don't patch.** Every run rebuilds the 7-day window from all held raw files.
+  That takes seconds and gives the same answer however earlier runs went.
+- **Only covered days.** A day is published once the held files span all of it plus a
+  24-hour settle lag, because a measured 6% to 22% of a day's matches arrive later than
+  6 hours (see [docs/source-notes.md](docs/source-notes.md)). The newest day shown is
+  therefore two days old.
+- **Rates from counts.** The summary stores additive daily counts, and the browser sums
+  the selected days and divides once.
+- **Tiers from confidence.** Tiers come from the 95% Wilson interval, so 52% over 200
+  games isn't ranked like 52% over 20,000.
+- **Validate, then publish.** Every counted match must have two full teams and one
+  winner, or the run fails and the last good summary keeps serving.
+- **No overlapping runs, no locks.** Lambda reserved concurrency is 1.
+- **No player data.** `account_id` is never read.
 
 ## The dashboard
 
@@ -53,7 +80,7 @@ Every run follows the same sequence (`pipeline/run.py`):
    - Produce daily per-hero sums. Wins come from the match's winning team, not the
      per-row `won` flag.
 5. **Coverage.** Rows for a match keep arriving after its day ends. Each UTC day is
-   therefore judged over the day plus a 6-hour settle lag. A day is published only if the
+   therefore judged over the day plus a 24-hour settle lag. A day is published only if the
    held data reaches the end of that span with at most 30 minutes missing in total.
    Partial days are withheld because an undercounted day can look plausible.
 6. **Validate.** Every covered day must satisfy `appearances = 12 × matches` and
@@ -76,9 +103,22 @@ pipeline/sql/   curate.sql: dedup, exclusions, daily hero counters
 tests/          pytest suite (moto for S3)
 fixtures/       hero list, manifest excerpt and sample rows for tests and offline runs
 web/            Vite + React 19 + Recharts dashboard
-infra/          Terraform: S3, CloudFront (OAC), Lambda, scheduler, alarms, budget, optional domain
+infra/          Terraform: S3, CloudFront (OAC), Lambda, scheduler, alarms, budget, Athena, optional domain
 tools/          build_lambda.sh, deploy_site.sh, deploy.sh
+docs/           data-contract.md (columns, rules, metrics), source-notes.md (what was verified)
+.github/        CI: Python, web and Terraform checks on every push
 ```
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs three jobs on every push to `main` and on every pull
+request. None of them needs AWS credentials.
+
+- **python:** ruff lint and format check, pytest (including the mocked-S3 end-to-end
+  run), then building the Lambda zip and importing it in a clean interpreter on Linux.
+- **web:** Vitest, then the production build, which includes the TypeScript check.
+- **terraform:** `terraform fmt -check` and `terraform validate`, with no backend and no
+  apply.
 
 ## Local development
 
@@ -141,7 +181,7 @@ secrets are involved.
 | `DT_HEROES_URL` | `https://api.deadlock-api.com/v1/assets/heroes` | Hero names and portraits |
 | `DT_DOWNLOAD_CAP_MB` | `300` | Most a single run downloads |
 | `DT_WINDOW_DAYS` | `7` | Days kept and shown |
-| `DT_SETTLE_LAG_HOURS` | `6` | How long after midnight a day keeps receiving rows |
+| `DT_SETTLE_LAG_HOURS` | `24` | How long after midnight a day keeps receiving rows |
 | `DT_MAX_GAP_MINUTES` | `30` | Total source gap allowed on a published day |
 | `DT_BUCKET` | *(empty)* | S3 data bucket; empty means local storage |
 
@@ -206,8 +246,33 @@ CNAME at the `cloudfront_domain` output. See `infra/domain.tf`.
 - **EventBridge Scheduler**: runs the Lambda hourly.
 - **Monitoring**: an SNS email topic, and two alarms. One fires on any failed run. The
   other fires after 3 hours with no runs, and exists only while the schedule is enabled.
+- **Athena** (`infra/athena.tf`): a Glue database with `matches` and `participants`
+  tables over `curated/`, using partition projection so new days are queryable without a
+  crawler. It also creates a workgroup that stops any query after 1 GiB scanned, and three
+  saved queries.
 - **Budget**: an email alert at 50% of actual spend and 100% of forecast spend
   (default $10/month). It only sends email; it doesn't stop anything.
+
+### Ad-hoc SQL with Athena
+
+In the Athena console, choose the `deadlock-tracker` workgroup and the
+`deadlock_tracker` database. Then open **Saved queries**:
+
+- `hero-win-rates-last-7-days`: recomputes the dashboard's main number independently.
+- `ranked-vs-unranked-win-rate`: per-hero win rate split by match mode. The dashboard
+  doesn't show this.
+- `match-length-by-day`: median match length per day.
+
+As a cross-check, matches per day from Athena should equal `daily_matches` in
+`summary.json` for covered days:
+
+```sh
+QID=$(aws athena start-query-execution --work-group deadlock-tracker \
+  --query-execution-context Database=deadlock_tracker \
+  --query-string "SELECT match_date_utc, COUNT(*) AS matches FROM matches GROUP BY 1 ORDER BY 1" \
+  --query QueryExecutionId --output text)
+sleep 5 && aws athena get-query-results --query-execution-id "$QID" --output table
+```
 
 ### Operations
 
@@ -218,6 +283,14 @@ CNAME at the `cloudfront_domain` output. See `infra/domain.tf`.
   once the summary is more than 3 hours old.
 - Schema drift (`UnsupportedSchema`) means upstream changed a column type or enum. Review
   the change and update `pipeline/contract.py` before the pipeline will run again.
+
+## Stack
+
+- **Pipeline:** Python 3.12, DuckDB, boto3
+- **Dashboard:** React 19, TypeScript, Vite, Recharts
+- **AWS (Terraform):** S3, Lambda, EventBridge Scheduler, CloudFront, ACM, CloudWatch,
+  SNS, Glue, Athena
+- **Quality:** pytest, moto, Vitest, Testing Library, Ruff, GitHub Actions
 
 ## Data source
 

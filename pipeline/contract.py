@@ -88,6 +88,8 @@ MAX_MATCH_ID = 2**63 - 1
 
 # Rebuild window and day-completeness rules.
 WINDOW_DAYS = 7
-SETTLE_LAG_S = 6 * 60 * 60  # late rows keep arriving after midnight
+# Late rows keep arriving after midnight. Measured 2026-10-17: 83% of matches complete
+# 6 h after the day ended, 99.8% after 24 h (docs/source-notes.md).
+SETTLE_LAG_S = 24 * 60 * 60
 MAX_COVERAGE_GAP_S = 30 * 60  # total source hole allowed per day
 MAX_UNKNOWN_ENUM_SHARE = 0.01  # above this, assume the codes changed

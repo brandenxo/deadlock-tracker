@@ -14,7 +14,8 @@ from pipeline.source import SourceClient
 from pipeline.storage import LocalStore, S3Store
 from tests.helpers import HEROES_FIXTURE, NOW, make_source
 
-SETTINGS = Settings(window_days=3, heroes_url=HEROES_FIXTURE.as_uri())
+# The synthetic source ends 6 h after its last day, so the lag is pinned to match it.
+SETTINGS = Settings(window_days=3, settle_lag_s=6 * 3600, heroes_url=HEROES_FIXTURE.as_uri())
 
 
 @pytest.fixture

@@ -262,6 +262,11 @@ select {
   color: var(--text);
 }
 
+.gap-note {
+  margin: 0 0 20px;
+  color: var(--text-secondary);
+}
+
 /* ---- Tier board --------------------------------------------------------------- */
 .tiers {
   border-top: 1px solid var(--rule);

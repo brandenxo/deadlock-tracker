@@ -71,6 +71,10 @@ function Dashboard({ summary }: { summary: Summary }) {
   const mostPlayed = [...rows].sort((a, b) => b.appearances - a.appearances || a.hero_id - b.hero_id)[0];
   const hero = rows.find((r) => r.hero_id === selected) ?? mostPlayed;
   const matches = eligibleMatches(summary, dates);
+  const gaps = dates.flatMap((d) => {
+    const minutes = summary.coverage.gap_minutes_by_date?.[d];
+    return minutes ? [`${minutes} min on ${d}`] : [];
+  });
 
   return (
     <>
@@ -86,6 +90,12 @@ function Dashboard({ summary }: { summary: Summary }) {
           <strong>{count(matches)}</strong> matches over {dates.length} {dates.length === 1 ? "day" : "days"}
         </p>
       </section>
+      {gaps.length > 0 && (
+        <p className="gap-note">
+          The data source is missing {gaps.join(", ")} (UTC), so match counts there read slightly
+          low. Win rates barely change.
+        </p>
+      )}
       <TierBoard rows={rows} selected={hero?.hero_id ?? null} onSelect={setSelected} />
       <div className="layout">
         <HeroTable rows={rows} selected={hero?.hero_id ?? null} onSelect={setSelected} />

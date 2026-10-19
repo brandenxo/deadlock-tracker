@@ -35,6 +35,18 @@ describe("App", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("says when a selected day has a hole in the source data, and only then", async () => {
+    const base = summaryFixture();
+    serve(() =>
+      jsonResponse(summaryFixture({ coverage: { ...base.coverage, gap_minutes_by_date: { "2026-10-06": 8 } } })),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(/missing 8 min on 2026-10-06/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "To" }), "2026-10-05");
+    expect(screen.queryByText(/missing 8 min/)).not.toBeInTheDocument();
+  });
+
   it("warns when the data is old", async () => {
     const old = new Date(Date.now() - 5 * 3_600_000).toISOString();
     serve(() => jsonResponse(summaryFixture({ built_at: old })));

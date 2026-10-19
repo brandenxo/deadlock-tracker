@@ -33,6 +33,9 @@ export interface Summary {
     settle_lag_hours: number;
     status_by_date: Record<UtcDate, "covered" | "partial" | "absent">;
     covered_dates: UtcDate[];
+    // Covered days with a small hole in the source's files (pipeline/coverage.py).
+    // Optional: summaries written before this field existed don't have it.
+    gap_minutes_by_date?: Record<UtcDate, number>;
   };
   players_per_team: number;
   daily_matches: { date: UtcDate; eligible_matches: number }[];

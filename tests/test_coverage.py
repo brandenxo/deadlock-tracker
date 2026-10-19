@@ -2,7 +2,14 @@
 
 from datetime import date
 
-from pipeline.coverage import DAY_S, classify, day_start, merge_intervals, window_dates
+from pipeline.coverage import (
+    DAY_S,
+    classify,
+    day_start,
+    merge_intervals,
+    missing_seconds,
+    window_dates,
+)
 
 D = date(2026, 10, 10)
 START = day_start(D)
@@ -35,3 +42,25 @@ def test_window_is_today_and_the_previous_days_in_utc():
         "2026-10-09",
         "2026-10-10",
     ]
+
+
+def test_a_small_hole_is_tolerated_and_reported():
+    hole = 8 * 60  # like the source's real Oct 17 compaction hole
+    held = [(START, START + 15 * 3600), (START + 15 * 3600 + hole, START + DAY_S + LAG)]
+    assert classify(held, [D], LAG) == {"2026-10-10": "partial"}  # default: no tolerance
+    assert classify(held, [D], LAG, max_gap_s=30 * 60) == {"2026-10-10": "covered"}
+    assert missing_seconds(held, [D], LAG) == {"2026-10-10": hole}
+
+
+def test_holes_add_up_against_the_tolerance():
+    held = [
+        (START, START + 3600),
+        (START + 3600 + 20 * 60, START + 7200),  # 20 min hole
+        (START + 7200 + 20 * 60, START + DAY_S + LAG),  # another 20 min
+    ]
+    assert classify(held, [D], LAG, max_gap_s=30 * 60) == {"2026-10-10": "partial"}
+
+
+def test_the_settle_lag_end_is_never_tolerated():
+    held = [(START, START + DAY_S + LAG - 60)]  # one minute short of the end
+    assert classify(held, [D], LAG, max_gap_s=30 * 60) == {"2026-10-10": "partial"}

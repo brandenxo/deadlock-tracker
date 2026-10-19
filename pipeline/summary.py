@@ -35,8 +35,12 @@ def build_summary(
     curation: Curation,
     settle_lag_s: int,
     known_heroes: dict[int, dict],
+    missing_s: dict[str, int] | None = None,
 ) -> dict:
     covered = sorted(d for d, s in coverage.items() if s == "covered")
+    # Covered days can still have small source holes (coverage.py); minutes, rounded up.
+    gaps = missing_s or {}
+    gap_minutes = {d: -(-gaps[d] // 60) for d in covered if gaps.get(d, 0) > 0}
     hero_daily = [r for r in curation.hero_daily if r["date"] in covered]
     excluded: dict[str, int] = {}
     for d in covered:
@@ -53,6 +57,7 @@ def build_summary(
             "settle_lag_hours": settle_lag_s / 3600,
             "status_by_date": coverage,
             "covered_dates": covered,
+            "gap_minutes_by_date": gap_minutes,
         },
         "players_per_team": contract.PLAYERS_PER_TEAM,
         "daily_matches": [

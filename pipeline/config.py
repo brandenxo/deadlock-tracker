@@ -25,6 +25,7 @@ class Settings:
     download_cap_bytes: int = 300 * 1_000_000
     window_days: int = contract.WINDOW_DAYS
     settle_lag_s: int = contract.SETTLE_LAG_S
+    max_gap_s: int = contract.MAX_COVERAGE_GAP_S
     bucket: str = ""  # empty = local filesystem store
 
     @classmethod
@@ -38,5 +39,6 @@ class Settings:
             download_cap_bytes=_int(env, "DT_DOWNLOAD_CAP_MB", 300) * 1_000_000,
             window_days=_int(env, "DT_WINDOW_DAYS", contract.WINDOW_DAYS),
             settle_lag_s=_int(env, "DT_SETTLE_LAG_HOURS", contract.SETTLE_LAG_S // 3600) * 3600,
+            max_gap_s=_int(env, "DT_MAX_GAP_MINUTES", contract.MAX_COVERAGE_GAP_S // 60) * 60,
             bucket=env.get("DT_BUCKET", ""),
         )

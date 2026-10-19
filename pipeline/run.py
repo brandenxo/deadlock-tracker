@@ -79,7 +79,9 @@ def run_once(
             paths.append(path)
         con = curate.connect(workdir)
         curate.load_raw(con, paths)
-        status = coverage.classify([(p.lo, p.hi) for p in objects], dates, settings.settle_lag_s)
+        intervals = [(p.lo, p.hi) for p in objects]
+        status = coverage.classify(intervals, dates, settings.settle_lag_s, settings.max_gap_s)
+        missing = coverage.missing_seconds(intervals, dates, settings.settle_lag_s)
         result = curate.curate(con, [d.isoformat() for d in dates], players_per_team)
 
         # 4. Hero names are cosmetic: a failure here is logged, never fatal.
@@ -99,6 +101,7 @@ def run_once(
             curation=result,
             settle_lag_s=settings.settle_lag_s,
             known_heroes=known,
+            missing_s=missing,
         )
         summary.validate(doc, result, players_per_team)
         replace_curated(store, con, workdir / "curated")

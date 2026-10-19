@@ -90,4 +90,5 @@ MAX_MATCH_ID = 2**63 - 1
 # Window and coverage.
 WINDOW_DAYS = 7
 SETTLE_LAG_S = 6 * 60 * 60  # rows can arrive after a match ends; wait this long past a day
+MAX_COVERAGE_GAP_S = 30 * 60  # holes in a day's source files tolerated before it's "partial"
 MAX_UNKNOWN_ENUM_SHARE = 0.01  # more novelty than this means the source changed meaning

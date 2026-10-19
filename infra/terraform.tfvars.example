@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored).
+alert_email      = "you@example.com"
+schedule_enabled = false # set true after the first manual run publishes a summary
+# domain_name    = "deadlock.example.com" # optional, see infra/domain.tf

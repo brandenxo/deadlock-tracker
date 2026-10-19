@@ -1,0 +1,14 @@
+# Copy to backend.hcl (gitignored). Create the state bucket once, by hand, in the
+# account regional namespace of the project's selected Region (us-east-2):
+#   export AWS_PROFILE=deadlock-tracker
+#   ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+#   STATE_BUCKET=deadlock-tracker-tfstate-$ACCOUNT-us-east-2-an
+#   aws s3api create-bucket --bucket $STATE_BUCKET --bucket-namespace account-regional \
+#     --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+#   aws s3api put-bucket-versioning --bucket $STATE_BUCKET \
+#     --versioning-configuration Status=Enabled
+bucket       = "deadlock-tracker-tfstate-<account-id>-us-east-2-an"
+key          = "deadlock-tracker/terraform.tfstate"
+region       = "us-east-2"
+use_lockfile = true
+encrypt      = true

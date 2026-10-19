@@ -43,7 +43,8 @@ resource "aws_cloudfront_response_headers_policy" "security" {
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   default_root_object = "index.html"
-  price_class         = "PriceClass_100" # North America + Europe edges: cheapest
+  aliases             = local.use_domain ? [var.domain_name] : [] # domain.tf
+  price_class         = "PriceClass_100"                          # North America + Europe edges: cheapest
 
   origin {
     origin_id                = "site"
@@ -84,8 +85,12 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  # Without a domain: the free *.cloudfront.net certificate. With one: ours (domain.tf).
   viewer_certificate {
-    cloudfront_default_certificate = true # https://<id>.cloudfront.net for now
+    cloudfront_default_certificate = !local.use_domain
+    acm_certificate_arn            = local.use_domain ? aws_acm_certificate_validation.site[0].certificate_arn : null
+    ssl_support_method             = local.use_domain ? "sni-only" : null
+    minimum_protocol_version       = local.use_domain ? "TLSv1.2_2021" : null
   }
 }
 

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
-import { jsonResponse, summaryFixture } from "./fixtures";
+import { jsonResponse, modeSummaryFixture, summaryFixture } from "./fixtures";
 
 function serve(...responses: (() => Response)[]) {
   let call = 0;
@@ -78,5 +78,28 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Assassin" }));
     expect(screen.getByRole("heading", { name: "Haze" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Abrams/ })).not.toBeInTheDocument();
+  });
+
+  it("switches between ranked, unranked and all matches", async () => {
+    serve(() => jsonResponse(modeSummaryFixture()));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "Abrams" });
+    const sample = () => screen.getByText(/matches over/).textContent;
+    expect(sample()).toMatch(/^500 matches/);
+    await user.click(screen.getByRole("button", { name: "Unranked" }));
+    expect(sample()).toMatch(/^100 matches/);
+    expect(screen.queryByRole("button", { name: /Bebop/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ranked" }));
+    expect(sample()).toMatch(/^400 matches/);
+    await user.click(screen.getByRole("button", { name: "All matches" }));
+    expect(sample()).toMatch(/^500 matches/);
+  });
+
+  it("hides the mode toggle for a summary that isn't split by mode", async () => {
+    serve(() => jsonResponse(summaryFixture()));
+    render(<App />);
+    await screen.findByRole("heading", { name: "Abrams" });
+    expect(screen.queryByRole("group", { name: "Match mode" })).not.toBeInTheDocument();
   });
 });

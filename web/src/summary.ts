@@ -1,6 +1,6 @@
 // Fetches data/summary.json (same origin, static) and derives the per-hero numbers.
 import { tierOf, wilson } from "./stats";
-import type { HeroDaily, HeroInfo, HeroRow, SeriesPoint, Summary, UtcDate } from "./types";
+import type { HeroDaily, HeroInfo, HeroRow, Mode, SeriesPoint, Summary, UtcDate } from "./types";
 
 export const SUMMARY_URL = "/data/summary.json";
 
@@ -12,7 +12,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 // Runtime shape check: the static types can't validate fetched JSON.
 export function parseSummary(body: unknown): Summary {
-  if (!isObject(body) || body.schema_version !== 1) throw new LoadError("Unsupported data format.");
+  // Schema 1 is still accepted so a deploy doesn't break the page before the next run.
+  if (!isObject(body) || (body.schema_version !== 1 && body.schema_version !== 2)) {
+    throw new LoadError("Unsupported data format.");
+  }
   const coverage = body.coverage;
   if (!isObject(coverage) || !Array.isArray(coverage.covered_dates)) {
     throw new LoadError("Data file is missing coverage.");
@@ -45,12 +48,17 @@ export async function fetchSummary(signal?: AbortSignal): Promise<Summary | null
 const ratio = (numerator: number, denominator: number) =>
   denominator === 0 ? null : numerator / denominator;
 
+// Whether counters are split by match mode (schema 2). Null mode means all matches.
+export const hasModes = (summary: Summary) => summary.schema_version === 2;
+const inMode = (row: { match_mode?: Mode }, mode: Mode | null) =>
+  mode === null || row.match_mode === mode;
+
 export function heroInfo(summary: Summary, heroId: number): HeroInfo {
   return summary.heroes[String(heroId)] ?? { name: `Hero ${heroId}`, type: null, image: null };
 }
 
 function toRow(info: HeroInfo, heroId: number, rows: HeroDaily[], eligibleMatches: number): HeroRow {
-  const sum = (key: keyof Omit<HeroDaily, "date" | "hero_id">) =>
+  const sum = (key: keyof Omit<HeroDaily, "date" | "match_mode" | "hero_id">) =>
     rows.reduce((total, r) => total + r[key], 0);
   const appearances = sum("appearances");
   const wins = sum("wins");
@@ -77,30 +85,31 @@ export function datesBetween(summary: Summary, from: UtcDate, to: UtcDate): UtcD
   return summary.coverage.covered_dates.filter((d) => d >= from && d <= to);
 }
 
-export function eligibleMatches(summary: Summary, dates: UtcDate[]): number {
+export function eligibleMatches(summary: Summary, dates: UtcDate[], mode: Mode | null = null): number {
   const wanted = new Set(dates);
   return summary.daily_matches
-    .filter((d) => wanted.has(d.date))
+    .filter((d) => wanted.has(d.date) && inMode(d, mode))
     .reduce((total, d) => total + d.eligible_matches, 0);
 }
 
-// Per-hero totals across `dates`.
-export function heroTotals(summary: Summary, dates: UtcDate[]): HeroRow[] {
+// Per-hero totals across `dates`, summed over modes unless one is chosen.
+export function heroTotals(summary: Summary, dates: UtcDate[], mode: Mode | null = null): HeroRow[] {
   const wanted = new Set(dates);
   const byHero = new Map<number, HeroDaily[]>();
   for (const row of summary.hero_daily) {
-    if (!wanted.has(row.date)) continue;
+    if (!wanted.has(row.date) || !inMode(row, mode)) continue;
     byHero.set(row.hero_id, [...(byHero.get(row.hero_id) ?? []), row]);
   }
-  const matches = eligibleMatches(summary, dates);
+  const matches = eligibleMatches(summary, dates, mode);
   return [...byHero].map(([heroId, rows]) => toRow(heroInfo(summary, heroId), heroId, rows, matches));
 }
 
 // Daily series for one hero over all covered dates; unplayed days have null rates.
-export function heroSeries(summary: Summary, heroId: number): SeriesPoint[] {
+export function heroSeries(summary: Summary, heroId: number, mode: Mode | null = null): SeriesPoint[] {
   return summary.coverage.covered_dates.map((date) => {
-    const rows = summary.hero_daily.filter((r) => r.date === date && r.hero_id === heroId);
-    return { date, ...toRow(heroInfo(summary, heroId), heroId, rows, eligibleMatches(summary, [date])) };
+    const rows = summary.hero_daily.filter((r) => r.date === date && r.hero_id === heroId && inMode(r, mode));
+    const matches = eligibleMatches(summary, [date], mode);
+    return { date, ...toRow(heroInfo(summary, heroId), heroId, rows, matches) };
   });
 }
 

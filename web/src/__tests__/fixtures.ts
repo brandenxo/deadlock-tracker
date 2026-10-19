@@ -1,4 +1,4 @@
-import type { HeroDaily, Summary } from "../types";
+import type { HeroDaily, Mode, Summary } from "../types";
 
 const day = (date: string, hero_id: number, appearances: number, wins: number,
   duration_sum_s: number, duration_count: number): HeroDaily =>
@@ -35,6 +35,29 @@ export function summaryFixture(overrides: Partial<Summary> = {}): Summary {
     excluded_matches: { incomplete_roster: 3 },
     ...overrides,
   };
+}
+
+const modeDay = (mode: Mode, ...args: Parameters<typeof day>): HeroDaily => ({ ...day(...args), match_mode: mode });
+
+// Schema 2: the same totals as summaryFixture, split by match mode. Abrams is the only
+// hero with unranked games (40 of them, 20 wins, across 100 unranked matches).
+export function modeSummaryFixture(overrides: Partial<Summary> = {}): Summary {
+  return summaryFixture({
+    schema_version: 2,
+    daily_matches: [
+      { date: "2026-10-05", match_mode: "Ranked", eligible_matches: 200 },
+      { date: "2026-10-05", match_mode: "Unranked", eligible_matches: 100 },
+      { date: "2026-10-06", match_mode: "Ranked", eligible_matches: 200 },
+    ],
+    hero_daily: [
+      modeDay("Ranked", "2026-10-05", 6, 80, 60, 144000, 80),
+      modeDay("Unranked", "2026-10-05", 6, 40, 20, 72000, 40),
+      modeDay("Ranked", "2026-10-06", 6, 30, 10, 54000, 30),
+      modeDay("Ranked", "2026-10-05", 15, 40, 18, 72000, 40),
+      modeDay("Ranked", "2026-10-06", 13, 5, 4, 0, 0),
+    ],
+    ...overrides,
+  });
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {

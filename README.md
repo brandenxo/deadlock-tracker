@@ -55,7 +55,8 @@ For any range of fully covered days in the last 7, the dashboard shows each hero
   least 100 games to get a tier.
 - **Daily trend chart.**
 
-You can filter by hero role. A banner warns when the data is more than 3 hours old, and
+You can filter by hero role and by match mode (all, ranked or unranked; about 18% of
+eligible matches are ranked). A banner warns when the data is more than 3 hours old, and
 the page names any days that contain a small upstream data gap.
 
 ## How a run works
@@ -77,14 +78,14 @@ Every run follows the same sequence (`pipeline/run.py`):
    - Exclude ineligible matches, recording the first reason that applies. Reasons include
      non-Normal game mode, private, bot or test lobbies, draws, unscored matches, rosters
      that aren't 6v6, unknown enum codes, and ambiguous duplicates.
-   - Produce daily per-hero sums. Wins come from the match's winning team, not the
-     per-row `won` flag.
+   - Produce daily per-hero sums, split by match mode (ranked or unranked). Wins come
+     from the match's winning team, not the per-row `won` flag.
 5. **Coverage.** Rows for a match keep arriving after its day ends. Each UTC day is
    therefore judged over the day plus a 24-hour settle lag. A day is published only if the
    held data reaches the end of that span with at most 30 minutes missing in total.
    Partial days are withheld because an undercounted day can look plausible.
 6. **Validate.** Every covered day must satisfy `appearances = 12 × matches` and
-   `wins = 6 × matches`, and unknown enum values must stay under 1% of matches. If any
+   `wins = 6 × matches` for each match mode, and unknown enum values must stay under 1% of matches. If any
    check fails, the run publishes nothing and the previous summary stays up.
 7. **Publish.** Replace the date-partitioned Parquet under `curated/`, then write
    `data/summary.json` atomically.
@@ -93,7 +94,7 @@ Hero names, roles and portraits come from the Deadlock API's hero list. That loo
 optional: if it fails, the dashboard shows `Hero <id>` instead.
 
 `data/summary.json` holds sums only, never rates. The dashboard adds up the selected days
-and divides once, so each day counts in proportion to its number of games.
+and match modes and divides once, so each day counts in proportion to its number of games.
 
 ## Repository layout
 

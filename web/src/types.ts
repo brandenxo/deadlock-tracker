@@ -6,9 +6,11 @@
 
 export type UtcDate = string;
 export type Role = "brawler" | "marksman" | "mystic" | "assassin";
+export type Mode = "Ranked" | "Unranked";
 
 export interface HeroDaily {
   date: UtcDate;
+  match_mode?: Mode; // schema 2; schema 1 rows cover both modes
   hero_id: number;
   appearances: number;
   wins: number;
@@ -24,7 +26,7 @@ export interface HeroInfo {
 }
 
 export interface Summary {
-  schema_version: 1;
+  schema_version: 1 | 2; // 2 splits counters by match_mode
   built_at: string;
   source: { manifest_version: number; manifest_generated_at: string };
   coverage: {
@@ -36,7 +38,7 @@ export interface Summary {
     gap_minutes_by_date?: Record<UtcDate, number>;
   };
   players_per_team: number;
-  daily_matches: { date: UtcDate; eligible_matches: number }[];
+  daily_matches: { date: UtcDate; match_mode?: Mode; eligible_matches: number }[];
   hero_daily: HeroDaily[];
   heroes: Record<string, HeroInfo>; // JSON keys: stringified hero_id
   excluded_matches: Record<string, number>;

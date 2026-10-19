@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HeroPanel } from "./components/HeroPanel";
 import { HeroTable } from "./components/HeroTable";
+import { ModeFilter } from "./components/ModeFilter";
 import { RangePicker } from "./components/RangePicker";
 import { RoleFilter } from "./components/RoleFilter";
 import { TierBoard } from "./components/TierBoard";
@@ -10,11 +11,12 @@ import {
   datesBetween,
   eligibleMatches,
   fetchSummary,
+  hasModes,
   heroSeries,
   heroTotals,
   STALE_AFTER_HOURS,
 } from "./summary";
-import type { Role, Summary, UtcDate } from "./types";
+import type { Mode, Role, Summary, UtcDate } from "./types";
 
 type Load =
   | { state: "loading" }
@@ -62,15 +64,16 @@ function Dashboard({ summary }: { summary: Summary }) {
   const covered = summary.coverage.covered_dates;
   const [range, setRange] = useState({ from: covered[0]!, to: covered[covered.length - 1]! });
   const [role, setRole] = useState<Role | null>(null);
+  const [mode, setMode] = useState<Mode | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
   const dates = useMemo(() => datesBetween(summary, range.from, range.to), [summary, range]);
-  const all = useMemo(() => heroTotals(summary, dates), [summary, dates]);
+  const all = useMemo(() => heroTotals(summary, dates, mode), [summary, dates, mode]);
   const rows = useMemo(() => (role ? all.filter((r) => r.type === role) : all), [all, role]);
   // Default selection: most-played hero in view.
   const mostPlayed = [...rows].sort((a, b) => b.appearances - a.appearances || a.hero_id - b.hero_id)[0];
   const hero = rows.find((r) => r.hero_id === selected) ?? mostPlayed;
-  const matches = eligibleMatches(summary, dates);
+  const matches = eligibleMatches(summary, dates, mode);
   const gaps = dates.flatMap((d) => {
     const minutes = summary.coverage.gap_minutes_by_date?.[d];
     return minutes ? [`${minutes} min on ${d}`] : [];
@@ -86,6 +89,7 @@ function Dashboard({ summary }: { summary: Summary }) {
           onChange={(from: UtcDate, to: UtcDate) => setRange({ from, to })}
         />
         <RoleFilter role={role} onChange={setRole} />
+        {hasModes(summary) && <ModeFilter mode={mode} onChange={setMode} />}
         <p className="sample">
           <strong>{count(matches)}</strong> matches over {dates.length} {dates.length === 1 ? "day" : "days"}
         </p>
@@ -99,7 +103,7 @@ function Dashboard({ summary }: { summary: Summary }) {
       <TierBoard rows={rows} selected={hero?.hero_id ?? null} onSelect={setSelected} />
       <div className="layout">
         <HeroTable rows={rows} selected={hero?.hero_id ?? null} onSelect={setSelected} />
-        {hero && <HeroPanel hero={hero} series={heroSeries(summary, hero.hero_id)} />}
+        {hero && <HeroPanel hero={hero} series={heroSeries(summary, hero.hero_id, mode)} />}
       </div>
     </>
   );
@@ -127,7 +131,7 @@ export function App() {
           <div className="notice">
             <p>
               <strong>No complete day of data yet.</strong> A UTC day is published once the pipeline
-              holds all of it plus a few hours for late matches. Check back after the next hourly run.
+              holds all of it plus a day for late matches. Check back after the next hourly run.
             </p>
           </div>
         )}

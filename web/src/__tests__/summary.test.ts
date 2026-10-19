@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ageHours, datesBetween, heroSeries, heroTotals, parseSummary } from "../summary";
-import { summaryFixture } from "./fixtures";
+import { ageHours, datesBetween, eligibleMatches, hasModes, heroSeries, heroTotals, parseSummary } from "../summary";
+import { modeSummaryFixture, summaryFixture } from "./fixtures";
 
 const summary = summaryFixture();
 const both = ["2026-10-05", "2026-10-06"];
@@ -51,9 +51,41 @@ describe("datesBetween", () => {
   });
 });
 
+describe("match modes", () => {
+  const split = modeSummaryFixture();
+
+  it("gives the same totals as an unsplit summary when no mode is chosen", () => {
+    expect(heroTotals(split, both)).toEqual(heroTotals(summary, both));
+    expect(eligibleMatches(split, both)).toBe(500);
+  });
+
+  it("counts only the chosen mode's games and matches", () => {
+    const abrams = heroTotals(split, both, "Unranked").find((r) => r.hero_id === 6)!;
+    expect([abrams.appearances, abrams.win_rate, abrams.pick_rate]).toEqual([40, 0.5, 40 / 100]);
+    expect(heroTotals(split, both, "Unranked").map((r) => r.hero_id)).toEqual([6]);
+    expect(eligibleMatches(split, both, "Ranked")).toBe(400);
+  });
+
+  it("filters the daily series by mode", () => {
+    const series = heroSeries(split, 6, "Unranked");
+    expect(series.map((p) => p.appearances)).toEqual([40, 0]);
+    expect(series[1]!.win_rate).toBeNull();
+  });
+
+  it("only offers modes when the summary is split", () => {
+    expect(hasModes(split)).toBe(true);
+    expect(hasModes(summary)).toBe(false);
+  });
+});
+
 describe("parseSummary", () => {
+  it("accepts both schema versions", () => {
+    expect(parseSummary(summary)).toBe(summary);
+    expect(parseSummary(modeSummaryFixture()).schema_version).toBe(2);
+  });
+
   it("rejects an unknown format instead of rendering garbage", () => {
-    expect(() => parseSummary({ ...summary, schema_version: 2 })).toThrow("Unsupported");
+    expect(() => parseSummary({ ...summary, schema_version: 3 })).toThrow("Unsupported");
     expect(() => parseSummary({ ...summary, hero_daily: [{ date: 1 }] })).toThrow("malformed");
   });
 });
